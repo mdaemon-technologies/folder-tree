@@ -2,13 +2,13 @@
   "name": "@mdaemon/folder-tree",
   "version": "1.0.0",
   "description": "A zero-dependency TypeScript tree view component — drop-in jstree replacement, no jQuery required",
-  "homepage": "https://github.com/mdaemon-technologies/MDFolderTree",
+  "homepage": "https://github.com/mdaemon-technologies/folder-tree",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mdaemon-technologies/MDFolderTree.git"
+    "url": "https://github.com/mdaemon-technologies/folder-tree.git"
   },
   "bugs": {
-    "url": "https://github.com/mdaemon-technologies/MDFolderTree/issues"
+    "url": "https://github.com/mdaemon-technologies/folder-tree/issues"
   },
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -44,10 +44,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build --mode production",
+    "build": "vite build --mode production && vite build --mode umd",
     "build:dev": "vite build --mode development",
     "build:umd": "vite build --mode umd",
-    "build:all": "npm run build && npm run build:umd",
+    "build:all": "npm run build",
     "dev": "vite build --watch --mode development",
     "test": "jest",
     "test:coverage": "jest --coverage",

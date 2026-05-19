@@ -12,26 +12,17 @@ export default defineConfig(({ mode }) => {
           entry: resolve(__dirname, 'src/umd.ts'),
           name: 'MDFolderTree',
           formats: ['umd'],
-          fileName: (format) => `MDFolderTree.${format}.js`,
+          fileName: () => 'MDFolderTree.umd.js',
         },
         outDir: 'dist',
         emptyOutDir: false,
         sourcemap: false,
-        minify: 'terser',
+        minify: true,
         rollupOptions: {
           external: [],
-          output: [
-            {
-              format: 'umd',
-              entryFileNames: 'MDFolderTree.umd.js',
-              name: 'MDFolderTree',
-            },
-            {
-              format: 'umd',
-              entryFileNames: 'MDFolderTree.umd.min.js',
-              name: 'MDFolderTree',
-            },
-          ],
+          output: {
+            name: 'MDFolderTree',
+          },
         },
       },
     };
@@ -69,7 +60,7 @@ export default defineConfig(({ mode }) => {
         },
       },
       sourcemap: mode !== 'production',
-      minify: false,
+      minify: mode === 'production' ? 'esbuild' : false,
     },
   };
 });
