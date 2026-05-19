@@ -1,7 +1,7 @@
 {
   "name": "@mdaemon/folder-tree",
   "version": "1.0.0",
-  "description": "A zero-dependency TypeScript tree view component — drop-in md-tree replacement, no jQuery required",
+  "description": "A zero-dependency TypeScript tree view component — drop-in jstree replacement, no jQuery required",
   "homepage": "https://github.com/mdaemon-technologies/MDFolderTree",
   "repository": {
     "type": "git",
