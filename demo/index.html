@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MDFolderTree — Interactive Demo</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="demo-layout">
+    <header class="demo-header">
+      <h1>MDFolderTree Demo</h1>
+      <p class="subtitle">Interactive feature playground — toggle plugins and settings on the fly</p>
+    </header>
+
+    <aside class="demo-controls">
+      <h2>Configuration</h2>
+
+      <fieldset>
+        <legend>Plugins</legend>
+        <label><input type="checkbox" id="opt-types" checked /> Types (icon mapping)</label>
+        <label><input type="checkbox" id="opt-checkbox" /> Checkbox (multi-select)</label>
+        <label><input type="checkbox" id="opt-search" /> Search (filter nodes)</label>
+        <label><input type="checkbox" id="opt-changed" /> Changed (selection diff)</label>
+        <label><input type="checkbox" id="opt-conditionalselect" /> Conditionalselect</label>
+        <label><input type="checkbox" id="opt-wholerow" /> Wholerow</label>
+        <label><input type="checkbox" id="opt-sort" /> Sort</label>
+        <label><input type="checkbox" id="opt-unique" /> Unique</label>
+        <label><input type="checkbox" id="opt-state" /> State (persist)</label>
+        <label><input type="checkbox" id="opt-contextmenu" /> Context menu</label>
+        <label><input type="checkbox" id="opt-dnd" /> Drag &amp; drop</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Core Settings</legend>
+        <label><input type="checkbox" id="opt-multiple" checked /> Multiple selection</label>
+        <label><input type="checkbox" id="opt-dblclick-toggle" checked /> Double-click toggle</label>
+        <label><input type="checkbox" id="opt-dots" checked /> Show dots</label>
+        <label><input type="checkbox" id="opt-icons" checked /> Show icons</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Checkbox Options</legend>
+        <label><input type="checkbox" id="opt-keep-selected-style" /> Keep selected style</label>
+        <label><input type="checkbox" id="opt-three-state" checked /> Three-state (tri-state)</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Search Options</legend>
+        <label><input type="checkbox" id="opt-show-only-matches" checked /> Show only matches</label>
+        <label><input type="checkbox" id="opt-case-sensitive" /> Case sensitive</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sort Options</legend>
+        <label><input type="radio" name="sort-mode" value="alpha" checked /> Alphabetical (A→Z)</label>
+        <label><input type="radio" name="sort-mode" value="reverse" /> Reverse (Z→A)</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Conditionalselect</legend>
+        <label><input type="checkbox" id="opt-block-disabled-text" /> Block nodes with "Overdue"</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>State Options</legend>
+        <label>Key: <input type="text" id="opt-state-key" value="demo-tree-state" size="14" /></label>
+        <button id="btn-clear-state" class="small-btn">Clear saved state</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>DnD Options</legend>
+        <label><input type="checkbox" id="opt-dnd-copy" /> Hold Ctrl to copy</label>
+        <label>Open timeout: <input type="number" id="opt-dnd-open-timeout" value="500" size="4" min="0" step="100" /> ms</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Data Source</legend>
+        <label><input type="radio" name="data-source" value="json" checked /> JSON (programmatic)</label>
+        <label><input type="radio" name="data-source" value="html" /> Pre-rendered HTML</label>
+        <label><input type="radio" name="data-source" value="callback" /> Lazy callback</label>
+      </fieldset>
+
+      <div class="control-buttons">
+        <button id="btn-rebuild">Rebuild Tree</button>
+      </div>
+
+      <fieldset>
+        <legend>Actions</legend>
+        <div class="action-row">
+          <button id="btn-open-all">Open All</button>
+          <button id="btn-close-all">Close All</button>
+        </div>
+        <div class="action-row">
+          <button id="btn-select-all">Select All</button>
+          <button id="btn-deselect-all">Deselect All</button>
+        </div>
+        <div class="action-row">
+          <button id="btn-destroy">Destroy</button>
+        </div>
+        <div class="action-row">
+          <button id="btn-create-node">Create Node</button>
+          <button id="btn-rename-node">Rename Selected</button>
+          <button id="btn-delete-node">Delete Selected</button>
+        </div>
+        <div class="action-row">
+          <button id="btn-cut">Cut</button>
+          <button id="btn-copy">Copy</button>
+          <button id="btn-paste">Paste</button>
+        </div>
+        <div class="action-row">
+          <button id="btn-edit">Edit (inline)</button>
+          <button id="btn-refresh">Refresh</button>
+        </div>
+        <div class="action-row">
+          <button id="btn-hide-node">Hide Selected</button>
+          <button id="btn-show-all">Show All</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Theme Toggles</legend>
+        <div class="action-row">
+          <button id="btn-toggle-stripes">Toggle Stripes</button>
+          <button id="btn-toggle-ellipsis">Toggle Ellipsis</button>
+        </div>
+      </fieldset>
+    </aside>
+
+    <main class="demo-main">
+      <div class="tree-container">
+        <h2>Tree</h2>
+        <div class="search-bar" style="display:none">
+          <input type="text" id="input-search" placeholder="Search nodes..." />
+          <button id="btn-search">Search</button>
+          <button id="btn-clear-search">Clear</button>
+        </div>
+        <div id="tree-target"></div>
+        <!-- Pre-rendered HTML source (hidden, used when data-source = html) -->
+        <div id="html-source" style="display:none">
+          <ul>
+            <li id="html-inbox" class="md-tree-open" data-md-tree='{"type":"email","opened":true}'>
+              <a>Inbox</a>
+              <ul>
+                <li id="html-important" data-md-tree='{"type":"email"}'>
+                  <a>Important</a>
+                </li>
+                <li id="html-social" data-md-tree='{"type":"email"}'>
+                  <a>Social</a>
+                </li>
+                <li id="html-promotions" data-md-tree='{"type":"email"}'>
+                  <a>Promotions</a>
+                </li>
+              </ul>
+            </li>
+            <li id="html-sent" data-md-tree='{"type":"email"}'>
+              <a>Sent</a>
+            </li>
+            <li id="html-drafts" data-md-tree='{"type":"documents"}'>
+              <a>Drafts</a>
+            </li>
+            <li id="html-trash" data-md-tree='{"type":"folder"}'>
+              <a>Trash</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="event-log-container">
+        <h2>Event Log <button id="btn-clear-log" class="small-btn">Clear</button></h2>
+        <div id="event-log"></div>
+      </div>
+
+      <div class="state-container">
+        <h2>Current State</h2>
+        <dl>
+          <dt>Selected IDs:</dt>
+          <dd id="state-selected"><em>none</em></dd>
+          <dt>Open nodes:</dt>
+          <dd id="state-open"><em>none</em></dd>
+        </dl>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./demo.ts"></script>
+</body>
+</html>

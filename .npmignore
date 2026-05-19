@@ -1,0 +1,31 @@
+# Source files
+src/
+tsconfig.json
+tsconfig.test.json
+vite.config.ts
+
+# Development files
+*.log
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+jest.config.*
+*.test.ts
+*.spec.ts
+__tests__/
+
+# Build artifacts
+node_modules/
+*.map
+
+# Documentation (keep README)
+docs/
+CHANGELOG.md

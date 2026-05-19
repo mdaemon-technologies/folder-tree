@@ -1,0 +1,366 @@
+/* ============================================================
+   MDFolderTree — Default Styles
+   ============================================================ */
+
+.md-tree {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.md-tree-container-ul,
+.md-tree-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.md-tree-node {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: 22px;
+  white-space: nowrap;
+  padding: 2px 0;
+}
+
+.md-tree-node > .md-tree-children {
+  flex-basis: 100%;
+}
+
+.md-tree-container-ul > .md-tree-node {
+  margin-left: 0;
+}
+
+.md-tree-anchor {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-decoration: none;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.1s;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.md-tree-anchor:hover,
+.md-tree-hovered {
+  background: #f0f4f8;
+}
+
+.md-tree-clicked {
+  background: #0366d6 !important;
+  color: white !important;
+}
+
+.md-tree-checkbox-no-clicked .md-tree-clicked {
+  background: transparent !important;
+  color: #333 !important;
+}
+
+.md-tree-disabled > .md-tree-anchor {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.md-tree-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.md-tree-ocl {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+.md-tree-ocl::before {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 5px 0 5px 7px;
+  border-color: transparent transparent transparent #666;
+}
+
+.md-tree-open > .md-tree-ocl::before {
+  border-width: 7px 5px 0 5px;
+  border-color: #666 transparent transparent transparent;
+}
+
+.md-tree-leaf > .md-tree-ocl::before {
+  content: '';
+  border: none;
+}
+
+.md-tree .md-tree-open > .md-tree-children {
+  display: block;
+}
+
+.md-tree .md-tree-closed > .md-tree-children,
+.md-tree .md-tree-leaf > .md-tree-children {
+  display: none;
+}
+
+.md-tree-themeicon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.md-tree-themeicon-custom {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  overflow: hidden;
+}
+
+.md-tree-themeicon-hidden {
+  display: none;
+}
+
+.md-tree-search {
+  background: #fff3cd;
+  border-radius: 2px;
+}
+
+/* Checkbox */
+.md-tree-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #adb5bd;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+  position: relative;
+  cursor: pointer;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.md-tree-checked > .md-tree-anchor > .md-tree-checkbox {
+  background: #0366d6;
+  border-color: #0366d6;
+}
+
+.md-tree-checked > .md-tree-anchor > .md-tree-checkbox::after {
+  content: '\2713';
+  color: white;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.md-tree-undetermined::after {
+  content: '\2014';
+  color: white;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.md-tree-undetermined {
+  background: #6c757d;
+  border-color: #6c757d;
+}
+
+/* No dots mode */
+.md-tree-no-dots .md-tree-node {
+  background-image: none;
+}
+
+/* No icons mode */
+.md-tree-no-icons .md-tree-themeicon {
+  display: none !important;
+}
+
+/* ============================================================
+   Wholerow Plugin
+   ============================================================ */
+
+.md-tree-wholerow-ul .md-tree-node {
+  position: relative;
+}
+
+.md-tree-wholerow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  border-radius: 3px;
+}
+
+.md-tree-wholerow-ul .md-tree-anchor:hover ~ .md-tree-wholerow,
+.md-tree-wholerow-ul .md-tree-hovered ~ .md-tree-wholerow {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.md-tree-wholerow-ul .md-tree-clicked ~ .md-tree-wholerow {
+  background: rgba(3, 102, 214, 0.08);
+}
+
+/* ============================================================
+   Context Menu Plugin
+   ============================================================ */
+
+.md-tree-contextmenu {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 150px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.md-tree-contextmenu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.md-tree-contextmenu li {
+  position: relative;
+}
+
+.md-tree-contextmenu li a {
+  display: block;
+  padding: 6px 12px;
+  color: #333;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.md-tree-contextmenu li a:hover {
+  background: #f0f0f0;
+}
+
+.md-tree-contextmenu-disabled a {
+  color: #999;
+  cursor: default;
+}
+
+.md-tree-contextmenu-disabled a:hover {
+  background: transparent;
+}
+
+.md-tree-contextmenu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: #e5e5e5;
+}
+
+.md-tree-contextmenu-submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  display: none;
+}
+
+.md-tree-contextmenu-has-submenu:hover > .md-tree-contextmenu-submenu {
+  display: block;
+}
+
+/* ============================================================
+   Drag & Drop Plugin
+   ============================================================ */
+
+.md-tree-dnd-helper {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-tree-dnd-marker {
+  height: 2px;
+  background: #0366d6;
+  pointer-events: none;
+}
+
+.md-tree-dnd-marker-inside {
+  height: auto;
+  background: rgba(3, 102, 214, 0.1);
+  border: 1px dashed #0366d6;
+}
+
+.md-tree-dnd-dragging .md-tree-node {
+  user-select: none;
+}
+
+/* ---- Node Visibility ---- */
+.md-tree-hidden {
+  display: none !important;
+}
+
+/* ---- Theme: Stripes ---- */
+.md-tree-striped .md-tree-container-ul > .md-tree-node:nth-child(odd) {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* ---- Theme: Ellipsis ---- */
+.md-tree-ellipsis .md-tree-anchor {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* ---- Clipboard Cut ---- */
+.md-tree-cut > .md-tree-anchor {
+  opacity: 0.5;
+}
+
+/* ---- Inline Editing ---- */
+.md-tree-rename-input {
+  border: 1px solid #0366d6;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: inherit;
+  font-family: inherit;
+  outline: none;
+  width: auto;
+  min-width: 60px;
+}
+
+/* ---- Keyboard Focus ---- */
+.md-tree-focused {
+  outline: 2px solid #0366d6;
+  outline-offset: -1px;
+  border-radius: 3px;
+}
