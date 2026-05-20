@@ -38,7 +38,9 @@ export function mdTree(
   ...rest: unknown[]
 ): MDFolderTree | unknown | undefined {
   const el = resolveElement(target);
-  if (!el) return undefined;
+  if (!el) {
+    throw new Error(`mdTree: element not found for selector "${target}".`);
+  }
 
   // mdTree('#tree', true) — return existing instance only
   if (arg === true) {

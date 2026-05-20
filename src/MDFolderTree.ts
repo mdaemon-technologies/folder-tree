@@ -44,6 +44,9 @@ export class MDFolderTree implements TreePluginHost {
   private destroyed = false;
 
   constructor(element: HTMLElement, config: TreeConfig = {}) {
+    if (!element || !element.classList) {
+      throw new Error('MDFolderTree: a valid DOM element is required as the first argument.');
+    }
     this.element = element;
     this.config = this.mergeDefaults(config);
     this.eventBus = new TreeEventBus(element);
