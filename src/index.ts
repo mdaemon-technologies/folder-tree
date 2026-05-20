@@ -4,6 +4,8 @@
  * Zero-dependency TypeScript tree view component.
  * Drop-in replacement for jstree.
  */
+import './styles.css';
+
 export { MDFolderTree } from './MDFolderTree';
 export { mdTree } from './jquery-bridge';
 export { TreeEventBus } from './events/TreeEventBus';
