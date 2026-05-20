@@ -1792,51 +1792,108 @@ export class MDFolderTree implements TreePluginHost {
   }
 
   private buildNodeTree(data: TreeNodeData[], parentId: string): void {
-    for (const raw of data) {
-      const node: TreeNode = {
-        id: raw.id,
-        text: raw.text,
-        icon: raw.icon ?? false,
-        type: raw.type ?? 'default',
-        parent: parentId,
-        parents: [],
-        children: [],
-        children_d: [],
-        state: {
-          opened: raw.state?.opened ?? false,
-          selected: raw.state?.selected ?? false,
-          disabled: raw.state?.disabled ?? false,
-          loaded: true,
-          loading: false,
-          checked: raw.state?.checked ?? false,
-        },
-        li_attr: raw.li_attr ?? {},
-        a_attr: raw.a_attr ?? {},
-        original: raw,
-      };
+    // Check if this is a flat array with parent references (jstree-style)
+    const hasParentRefs = data.some(
+      (n) => typeof n.parent === 'string' && n.parent !== parentId
+    );
 
-      this.store.set(node.id, node);
+    if (hasParentRefs) {
+      // Two-pass approach for flat arrays with parent references
+      // Pass 1: Create all nodes in the store
+      for (const raw of data) {
+        const nodeParent = (raw.parent as string) ?? parentId;
+        const node: TreeNode = {
+          id: raw.id,
+          text: raw.text,
+          icon: raw.icon ?? false,
+          type: raw.type ?? 'default',
+          parent: nodeParent,
+          parents: [],
+          children: [],
+          children_d: [],
+          state: {
+            opened: raw.state?.opened ?? false,
+            selected: raw.state?.selected ?? false,
+            disabled: raw.state?.disabled ?? false,
+            loaded: true,
+            loading: false,
+            checked: raw.state?.checked ?? false,
+          },
+          li_attr: raw.li_attr ?? {},
+          a_attr: raw.a_attr ?? {},
+          original: raw,
+        };
 
-      // Track selection
-      if (node.state.selected) {
-        this.selection.select(node.id);
-      }
+        this.store.set(node.id, node);
 
-      // Add to parent's children
-      if (parentId !== '#') {
-        const parent = this.store.get(parentId);
-        if (parent) {
-          parent.children.push(node.id);
-          parent.children_d.push(node.id);
+        if (node.state.selected) {
+          this.selection.select(node.id);
         }
       }
 
-      // Build parent chain
-      node.parents = this.buildParentChain(parentId);
+      // Pass 2: Wire up parent-child relationships
+      for (const raw of data) {
+        const node = this.store.get(raw.id)!;
+        const nodeParent = (raw.parent as string) ?? parentId;
 
-      // Recurse into children
-      if (Array.isArray(raw.children)) {
-        this.buildNodeTree(raw.children, node.id);
+        if (nodeParent !== '#') {
+          const parent = this.store.get(nodeParent);
+          if (parent) {
+            parent.children.push(node.id);
+            parent.children_d.push(node.id);
+          }
+        }
+
+        node.parents = this.buildParentChain(nodeParent);
+
+        if (Array.isArray(raw.children)) {
+          this.buildNodeTree(raw.children, node.id);
+        }
+      }
+    } else {
+      // Original behavior: all items are children of parentId
+      for (const raw of data) {
+        const node: TreeNode = {
+          id: raw.id,
+          text: raw.text,
+          icon: raw.icon ?? false,
+          type: raw.type ?? 'default',
+          parent: parentId,
+          parents: [],
+          children: [],
+          children_d: [],
+          state: {
+            opened: raw.state?.opened ?? false,
+            selected: raw.state?.selected ?? false,
+            disabled: raw.state?.disabled ?? false,
+            loaded: true,
+            loading: false,
+            checked: raw.state?.checked ?? false,
+          },
+          li_attr: raw.li_attr ?? {},
+          a_attr: raw.a_attr ?? {},
+          original: raw,
+        };
+
+        this.store.set(node.id, node);
+
+        if (node.state.selected) {
+          this.selection.select(node.id);
+        }
+
+        if (parentId !== '#') {
+          const parent = this.store.get(parentId);
+          if (parent) {
+            parent.children.push(node.id);
+            parent.children_d.push(node.id);
+          }
+        }
+
+        node.parents = this.buildParentChain(parentId);
+
+        if (Array.isArray(raw.children)) {
+          this.buildNodeTree(raw.children, node.id);
+        }
       }
     }
   }

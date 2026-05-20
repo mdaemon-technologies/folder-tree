@@ -144,6 +144,8 @@ document.getElementById('tree').addEventListener('changed.MDFolderTree', (e) => 
 
 **5. Config structure is unchanged** — `core`, `types`, `checkbox`, `search`, and `plugins` all work identically.
 
+**6. Flat arrays with `parent` references work as-is** — no need to restructure your data into nested `children` arrays. MDFolderTree detects and handles jstree-style flat JSON natively.
+
 #### Automated migration script
 
 A Node.js script is included that scans your codebase, reports what needs to change, and optionally applies the transformations:
@@ -219,10 +221,23 @@ The renderer outputs CSS class names following the same structure as jstree 3.3.
 
 ## Data Sources
 
-**JSON array:**
+**JSON array (nested):**
 ```ts
 core: { data: [{ id: '1', text: 'Node', children: [...] }] }
 ```
+
+**Flat array with parent references (jstree-style):**
+```ts
+core: {
+  data: [
+    { id: '1', text: 'Root',  parent: '#' },
+    { id: '2', text: 'Child', parent: '1' },
+    { id: '3', text: 'Leaf',  parent: '2' },
+  ]
+}
+```
+
+Flat arrays are detected automatically when nodes contain a `parent` property. This is fully compatible with jstree's flat JSON format — no data restructuring needed during migration.
 
 **Callback (lazy loading):**
 ```ts

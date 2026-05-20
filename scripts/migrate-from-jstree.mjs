@@ -253,7 +253,8 @@ async function applyChanges(findings, baseDir) {
   console.log('  3. Import the stylesheet:  import "@mdaemon/folder-tree/styles.css"');
   console.log('  4. Replace jstree script tags with the UMD bundle or ESM import');
   console.log('  5. Update event handlers to read from e.detail instead of callback data arg');
-  console.log('  6. Test your application\n');
+  console.log('  6. Flat arrays with parent references (e.g. { id, text, parent }) work as-is — no restructuring needed');
+  console.log('  7. Test your application\n');
 }
 
 function identifyChanges(original, modified) {
