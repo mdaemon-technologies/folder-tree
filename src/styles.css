@@ -47,6 +47,7 @@
 .md-tree-anchor:hover,
 .md-tree-hovered {
   background: #f0f4f8;
+  text-decoration: none;
 }
 
 .md-tree-clicked {

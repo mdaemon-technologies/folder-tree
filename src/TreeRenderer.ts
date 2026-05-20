@@ -72,7 +72,7 @@ export class TreeRenderer {
     li.setAttribute('role', 'treeitem');
 
     // State classes
-    const hasChildren = node.children.length > 0 || node.state.loading;
+    const hasChildren = node.children.length > 0 || node.state.loading || !node.state.loaded;
     if (hasChildren) {
       li.className = node.state.opened ? 'md-tree-node md-tree-open' : 'md-tree-node md-tree-closed';
     } else {

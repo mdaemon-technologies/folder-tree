@@ -94,6 +94,11 @@ export class MDFolderTree implements TreePluginHost {
     node.state.selected = true;
     this.selection.select(id);
 
+    // Sync checked state when checkbox plugin is active with tie_selection
+    if (this.checkboxPlugin && this.config.checkbox?.tie_selection !== false) {
+      node.state.checked = true;
+    }
+
     // If single-select, deselect others
     if (!(this.config.core?.multiple ?? true)) {
       for (const prevId of oldSelection) {
@@ -101,6 +106,9 @@ export class MDFolderTree implements TreePluginHost {
           const prev = this.store.get(prevId);
           if (prev) {
             prev.state.selected = false;
+            if (this.checkboxPlugin && this.config.checkbox?.tie_selection !== false) {
+              prev.state.checked = false;
+            }
             this.renderer.renderSingleNode(prev, this.getNodeMap());
           }
         }
@@ -126,6 +134,12 @@ export class MDFolderTree implements TreePluginHost {
     const oldSelection = this.selection.getSelected();
     node.state.selected = false;
     this.selection.deselect(id);
+
+    // Sync checked state when checkbox plugin is active with tie_selection
+    if (this.checkboxPlugin && this.config.checkbox?.tie_selection !== false) {
+      node.state.checked = false;
+    }
+
     this.renderer.renderSingleNode(node, this.getNodeMap());
 
     if (!suppress) {
@@ -490,6 +504,15 @@ export class MDFolderTree implements TreePluginHost {
   openNode(id: string, suppress = false): void {
     const node = this.store.get(id);
     if (!node) return;
+
+    // If the node hasn't been loaded yet, trigger lazy loading first
+    if (!node.state.loaded && !node.state.loading && typeof this.config.core?.data === 'function') {
+      this.load_node(id, () => {
+        this.openNode(id, suppress);
+      });
+      return;
+    }
+
     if (!suppress) {
       this.emit(`before_open.${EVENT_NS}`, { node });
     }
@@ -1815,7 +1838,7 @@ export class MDFolderTree implements TreePluginHost {
             opened: raw.state?.opened ?? false,
             selected: raw.state?.selected ?? false,
             disabled: raw.state?.disabled ?? false,
-            loaded: true,
+            loaded: raw.children !== true,
             loading: false,
             checked: raw.state?.checked ?? false,
           },
@@ -1866,7 +1889,7 @@ export class MDFolderTree implements TreePluginHost {
             opened: raw.state?.opened ?? false,
             selected: raw.state?.selected ?? false,
             disabled: raw.state?.disabled ?? false,
-            loaded: true,
+            loaded: raw.children !== true,
             loading: false,
             checked: raw.state?.checked ?? false,
           },
