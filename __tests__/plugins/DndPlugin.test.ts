@@ -1,24 +1,6 @@
 import { MDFolderTree } from '../../src/MDFolderTree';
 import type { TreeNodeData } from '../../src/types';
 
-// Polyfill PointerEvent for jsdom
-if (typeof PointerEvent === 'undefined') {
-  (globalThis as any).PointerEvent = class PointerEvent extends MouseEvent {
-    readonly pointerId: number;
-    readonly pointerType: string;
-    constructor(type: string, params: PointerEventInit = {}) {
-      super(type, params);
-      this.pointerId = (params as any).pointerId ?? 0;
-      this.pointerType = (params as any).pointerType ?? '';
-    }
-  };
-}
-
-// Polyfill document.elementFromPoint for jsdom
-if (typeof document.elementFromPoint !== 'function') {
-  document.elementFromPoint = () => null;
-}
-
 describe('DndPlugin', () => {
   let container: HTMLElement;
 

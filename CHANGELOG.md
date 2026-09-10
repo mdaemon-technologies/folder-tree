@@ -68,6 +68,78 @@ this release is covered by regression tests written against the previous behavio
 - `last_error()` and `core.error` now additionally report `cycle`,
   `missing_parent` and `duplicate_id` alongside the existing `check_callback`.
 
+### Fixed — model and DOM divergence
+
+- Selection no longer diverges from what is rendered. `TreeSelection` and each
+  node's `state.selected` flag were maintained independently and only the
+  former enforced `core.multiple`, so with `multiple: false` two nodes could
+  render as selected while the API reported one. The flag is now derived from
+  the selection set.
+- `select_all` honors `multiple: false` and skips disabled nodes, and its
+  `changed` event reports the real prior selection instead of a hardcoded
+  empty array (which made `changed.deselected` permanently empty).
+- Clicking a checkbox now honors `tie_selection`, `three_state` and the
+  `cascade_to_disabled` / `cascade_to_hidden` options. The click path ran a
+  second cascade implementation inside the core that ignored all of them; it
+  has been removed in favour of the plugin's.
+- Toggling a checkbox emits `changed`, so `StatePlugin` persists checkbox
+  interaction and consumers listening for `changed` see it. Unchecking now
+  emits `deselect_node` rather than `select_node`.
+- `check_all` skips disabled nodes, which could otherwise end up checked but
+  not selected.
+- Descendants keep correct ancestry after a move. `parents` and `children_d`
+  were patched by hand at each mutation site; `children_d` never held anything
+  deeper than direct children. Both are now rebuilt centrally after every
+  structural change, which also repairs `get_top_selected`,
+  `get_bottom_selected`, `get_top_checked` and drag-and-drop descendant checks.
+- Sorting no longer leaves the DOM and `node.children` in different orders.
+  Ordering is applied at render time and written back to the model.
+- `destroy()` removes the click, dblclick, hover and keydown listeners bound to
+  the container. A destroyed instance previously kept intercepting events aimed
+  at its replacement. The dnd plugin likewise releases its document-level
+  pointer listeners, and now abandons a drag on `pointercancel`.
+- Search state survives a redraw. Matching runs against the model rather than
+  the DOM, and results are re-applied when nodes render.
+- `refresh()` restores opened and selected nodes when `core.data` is an
+  asynchronous callback; previously it restored before the data arrived and
+  silently lost the state. It no longer re-emits `ready`.
+- Lazy-loaded, mass-loaded and HTML-parsed nodes are normalized like the
+  initial load, so a node without an `id` no longer reaches the store as
+  `undefined`. Generated ids cannot collide with ids supplied in the payload.
+- A node naming a parent that is not supplied is attached to the root and
+  reported, rather than being stored but never rendered.
+- `conditionalselect` returning `false` no longer lets the anchor's `href="#"`
+  navigate, which jumped the page to the top.
+- `End` focuses a collapsed parent when it is the last node, instead of
+  skipping every closed node.
+- An explicit per-node `icon` is no longer overwritten by its type's icon.
+- `get_json({ flat: true })` no longer nests `children` as well, which
+  duplicated the whole tree inside its first entry.
+- `StatePlugin` tolerates corrupt or outdated `localStorage` payloads instead
+  of throwing inside an event handler where the error was invisible.
+- `set_theme` survives a redraw; the renderer no longer re-applies
+  `md-tree-default` unconditionally.
+- Plugin hooks and the `core.data` callback are wrapped: failures are reported
+  through `core.error` / `last_error()` rather than being swallowed by DOM
+  event dispatch, and a throwing data callback no longer leaves a node stuck
+  in the loading state.
+
+### Changed
+
+- **Breaking:** `loaded` and `ready` are emitted one microtask after load
+  instead of synchronously during the constructor, where nothing could
+  subscribe in time to observe them. Code awaiting these events now works as
+  documented; tests asserting on them need to await a microtask.
+- **Breaking:** `moveNode` returns `false` for a destination parent that does
+  not exist rather than orphaning the node, and `check_callback` is no longer
+  consulted for a move that is already structurally invalid.
+- `close_opened_onclear` is now implemented; it was previously accepted and
+  ignored.
+- `TreePluginHost` gains `selectAll`, `deselectAll` and `setChildOrder`.
+- `TreeRenderer` and `JsonParser` take an optional additional constructor
+  argument (an error reporter and an id generator respectively). Both are
+  optional, so existing direct construction is unaffected.
+
 ### Documentation
 
 - README's "XSS safe" claim corrected to describe what is actually guaranteed —

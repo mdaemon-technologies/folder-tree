@@ -11,11 +11,31 @@ export class TreeRenderer {
   private container: HTMLElement;
   private plugins: TreePlugin[] = [];
   private sanitizeAttrs: boolean;
+  private themeName = 'default';
+  private onError?: (error: Record<string, unknown>) => void;
 
-  constructor(container: HTMLElement, plugins: TreePlugin[] = [], sanitizeAttrs = true) {
+  constructor(
+    container: HTMLElement,
+    plugins: TreePlugin[] = [],
+    sanitizeAttrs = true,
+    onError?: (error: Record<string, unknown>) => void,
+  ) {
     this.container = container;
     this.plugins = plugins;
     this.sanitizeAttrs = sanitizeAttrs;
+    this.onError = onError;
+  }
+
+  /**
+   * Run a plugin render hook. A throwing plugin must not abort the render and
+   * leave the tree half-drawn, so failures are reported and skipped.
+   */
+  private runHook(plugin: TreePlugin, hook: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (cause) {
+      this.onError?.({ error: 'plugin_hook', hook, plugin: plugin.name, cause });
+    }
   }
 
   /**
@@ -33,16 +53,17 @@ export class TreeRenderer {
     // Apply plugin pre-render hooks
     let processedNodes = nodes;
     for (const plugin of this.plugins) {
-      if (plugin.onBeforeRender) {
-        processedNodes = plugin.onBeforeRender(processedNodes);
-      }
+      if (!plugin.onBeforeRender) continue;
+      this.runHook(plugin, 'onBeforeRender', () => {
+        processedNodes = plugin.onBeforeRender!(processedNodes);
+      });
     }
 
     // Clear existing content
     this.container.innerHTML = '';
 
     // Set up root container classes
-    this.container.classList.add('md-tree', 'md-tree-default');
+    this.container.classList.add('md-tree', `md-tree-${this.themeName}`);
     this.container.setAttribute('role', 'tree');
 
     // Create root <ul>
@@ -152,9 +173,8 @@ export class TreeRenderer {
 
     // Plugin node-render hooks
     for (const plugin of this.plugins) {
-      if (plugin.onNodeRender) {
-        plugin.onNodeRender(node, li);
-      }
+      if (!plugin.onNodeRender) continue;
+      this.runHook(plugin, 'onNodeRender', () => plugin.onNodeRender!(node, li));
     }
 
     // Children
@@ -174,6 +194,11 @@ export class TreeRenderer {
     }
 
     return li;
+  }
+
+  /** The theme class re-applied on every full render. */
+  setThemeName(name: string): void {
+    this.themeName = name;
   }
 
   setPlugins(plugins: TreePlugin[]): void {

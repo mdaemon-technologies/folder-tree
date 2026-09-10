@@ -22,9 +22,13 @@ export class TreeSelection {
     return this.getSelected();
   }
 
+  /**
+   * Delegates to `select` per id so single-select mode is enforced here too
+   * rather than being bypassed by a bulk add.
+   */
   selectAll(ids: string[]): string[] {
     for (const id of ids) {
-      this.selected.add(id);
+      this.select(id);
     }
     return this.getSelected();
   }

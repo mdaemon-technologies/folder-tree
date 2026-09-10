@@ -73,12 +73,15 @@ export class StatePlugin implements TreePlugin {
 
     if (!raw) return;
 
-    let stored: { state: TreeState; expires?: number };
+    let stored: { state?: TreeState; expires?: number } | null;
     try {
-      stored = JSON.parse(raw);
+      stored = JSON.parse(raw) as { state?: TreeState; expires?: number } | null;
     } catch {
       return;
     }
+
+    // Storage is shared, user-writable and may predate the current shape.
+    if (!stored || typeof stored !== 'object') return;
 
     // Check TTL
     if (stored.expires && Date.now() > stored.expires) {
@@ -86,20 +89,22 @@ export class StatePlugin implements TreePlugin {
       return;
     }
 
+    if (!stored.state || typeof stored.state !== 'object') return;
+
     let state = stored.state;
     if (config.filter) {
       state = config.filter(state);
     }
 
     // Restore opened nodes
-    if (state.opened) {
+    if (Array.isArray(state.opened)) {
       for (const id of state.opened) {
         this.tree.openNode(id, true);
       }
     }
 
     // Restore selected nodes
-    if (state.selected) {
+    if (Array.isArray(state.selected)) {
       for (const id of state.selected) {
         this.tree.selectNode(id, true);
       }

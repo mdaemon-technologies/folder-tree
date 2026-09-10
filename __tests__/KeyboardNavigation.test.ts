@@ -148,4 +148,52 @@ describe('Keyboard Navigation', () => {
     pressKey('ArrowDown');
     expect(container.getAttribute('aria-activedescendant')).not.toBeNull();
   });
+
+  describe('End key with collapsed nodes', () => {
+    it('should focus a closed parent when it is the last node', () => {
+      const tree = new MDFolderTree(container, {
+        core: {
+          data: [
+            { id: 'first', text: 'First' },
+            { id: 'last', text: 'Last', children: [{ id: 'kid', text: 'Kid' }] },
+          ],
+        },
+      });
+      expect(tree.is_closed('last')).toBe(true);
+
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+
+      expect(container.getAttribute('aria-activedescendant')).toBe('last');
+    });
+
+    it('should not focus a child hidden inside a collapsed parent', () => {
+      new MDFolderTree(container, {
+        core: {
+          data: [
+            { id: 'first', text: 'First' },
+            { id: 'last', text: 'Last', children: [{ id: 'kid', text: 'Kid' }] },
+          ],
+        },
+      });
+
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+
+      expect(container.getAttribute('aria-activedescendant')).not.toBe('kid');
+    });
+
+    it('should focus the deepest visible node when the last parent is open', () => {
+      new MDFolderTree(container, {
+        core: {
+          data: [
+            { id: 'first', text: 'First' },
+            { id: 'last', text: 'Last', state: { opened: true }, children: [{ id: 'kid', text: 'Kid' }] },
+          ],
+        },
+      });
+
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+
+      expect(container.getAttribute('aria-activedescendant')).toBe('kid');
+    });
+  });
 });

@@ -208,6 +208,8 @@ export interface TreePluginHost {
   getOpenedIds(): string[];
   selectNode(id: string, suppress?: boolean): void;
   deselectNode(id: string, suppress?: boolean): void;
+  selectAll(suppress?: boolean): void;
+  deselectAll(suppress?: boolean): void;
   openNode(id: string, suppress?: boolean): void;
   closeNode(id: string, suppress?: boolean): void;
   getContainer(): HTMLElement;
@@ -222,6 +224,8 @@ export interface TreePluginHost {
   deleteNode(id: string): boolean;
   createNode(parentId: string, data: TreeNodeData, position?: number): TreeNode | false;
   reorderChildren(parentId: string, childIds: string[]): void;
+  /** Reorder a parent's children in the model only, without rendering. */
+  setChildOrder(parentId: string, childIds: string[]): void;
   getRootNodeIds(): string[];
 }
 

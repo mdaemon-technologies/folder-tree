@@ -66,7 +66,7 @@ describe('StatePlugin', () => {
     expect(stored.state.opened).toContain('n1');
   });
 
-  it('should restore state from localStorage on init', () => {
+  it('should restore state from localStorage on init', async () => {
     // Pre-populate localStorage with saved state
     mockStorage['test-tree-state'] = JSON.stringify({
       state: { opened: ['n1'], selected: ['n2'] },
@@ -77,6 +77,10 @@ describe('StatePlugin', () => {
       plugins: ['state'],
       state: { key: 'test-tree-state' },
     });
+
+    // Restore is driven by `ready`, which is deferred a microtask so that
+    // consumers can subscribe to it after construction.
+    await Promise.resolve();
 
     expect(tree.getNode('n1')!.state.opened).toBe(true);
     expect(tree.get_selected()).toContain('n2');
@@ -158,5 +162,38 @@ describe('StatePlugin', () => {
 
     tree.select_node('n1');
     expect(mockStorage['md-tree-state']).toBeDefined();
+  });
+
+  describe('corrupt storage', () => {
+    const readErrors = (): string[] => {
+      const seen: string[] = [];
+      const onError = (e: ErrorEvent) => { seen.push(e.message); e.preventDefault(); };
+      window.addEventListener('error', onError);
+      new MDFolderTree(container, {
+        core: { data: sampleData },
+        plugins: ['state'],
+        state: { key: 'corrupt-key' },
+      });
+      window.removeEventListener('error', onError);
+      return seen;
+    };
+
+    it('should tolerate a stored null payload', () => {
+      localStorage.setItem('corrupt-key', 'null');
+
+      expect(readErrors()).toEqual([]);
+    });
+
+    it('should tolerate a stored payload with no state object', () => {
+      localStorage.setItem('corrupt-key', '{"expires":123}');
+
+      expect(readErrors()).toEqual([]);
+    });
+
+    it('should tolerate a stored payload with a non-array opened list', () => {
+      localStorage.setItem('corrupt-key', '{"state":{"opened":"nope","selected":null}}');
+
+      expect(readErrors()).toEqual([]);
+    });
   });
 });

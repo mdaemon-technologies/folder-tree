@@ -56,4 +56,25 @@ describe('Theme Runtime API', () => {
     tree.set_theme_variant(false);
     expect(container.classList.contains('md-tree-default-large')).toBe(false);
   });
+
+  describe('theme persistence', () => {
+    it('should keep the active theme class after a redraw', () => {
+      const tree = new MDFolderTree(container, { core: { data: sampleData } });
+
+      tree.set_theme('dark');
+      tree.redraw();
+
+      expect(container.classList.contains('md-tree-dark')).toBe(true);
+      expect(container.classList.contains('md-tree-default')).toBe(false);
+      expect(tree.get_theme()).toBe('dark');
+    });
+
+    it('should keep the default theme class when no theme is set', () => {
+      const tree = new MDFolderTree(container, { core: { data: sampleData } });
+
+      tree.redraw();
+
+      expect(container.classList.contains('md-tree-default')).toBe(true);
+    });
+  });
 });

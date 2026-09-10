@@ -30,6 +30,7 @@ export class DndPlugin implements TreePlugin {
   private pointerDownHandler!: (e: PointerEvent) => void;
   private pointerMoveHandler!: (e: PointerEvent) => void;
   private pointerUpHandler!: (e: PointerEvent) => void;
+  private pointerCancelHandler!: (e: PointerEvent) => void;
 
   init(tree: TreePluginHost): void {
     this.tree = tree;
@@ -37,13 +38,28 @@ export class DndPlugin implements TreePlugin {
     this.pointerDownHandler = (e) => this.onPointerDown(e);
     this.pointerMoveHandler = (e) => this.onPointerMove(e);
     this.pointerUpHandler = (e) => this.onPointerUp(e);
+    this.pointerCancelHandler = () => this.onPointerCancel();
 
     tree.getContainer().addEventListener('pointerdown', this.pointerDownHandler);
   }
 
   destroy(): void {
     this.tree.getContainer().removeEventListener('pointerdown', this.pointerDownHandler);
+    // A drag in progress leaves listeners on the document, not the container.
+    this.detachDocumentListeners();
     this.cancelDrag();
+  }
+
+  private attachDocumentListeners(): void {
+    document.addEventListener('pointermove', this.pointerMoveHandler);
+    document.addEventListener('pointerup', this.pointerUpHandler);
+    document.addEventListener('pointercancel', this.pointerCancelHandler);
+  }
+
+  private detachDocumentListeners(): void {
+    document.removeEventListener('pointermove', this.pointerMoveHandler);
+    document.removeEventListener('pointerup', this.pointerUpHandler);
+    document.removeEventListener('pointercancel', this.pointerCancelHandler);
   }
 
   private getConfig(): DndConfig {
@@ -74,8 +90,7 @@ export class DndPlugin implements TreePlugin {
     this.startX = e.clientX;
     this.startY = e.clientY;
 
-    document.addEventListener('pointermove', this.pointerMoveHandler);
-    document.addEventListener('pointerup', this.pointerUpHandler);
+    this.attachDocumentListeners();
   }
 
   private onPointerMove(e: PointerEvent): void {
@@ -111,13 +126,18 @@ export class DndPlugin implements TreePlugin {
   }
 
   private onPointerUp(_e: PointerEvent): void {
-    document.removeEventListener('pointermove', this.pointerMoveHandler);
-    document.removeEventListener('pointerup', this.pointerUpHandler);
+    this.detachDocumentListeners();
 
     if (this.dragging && this.dragNode && this.dropTarget) {
       this.executeDrop();
     }
 
+    this.cancelDrag();
+  }
+
+  /** A cancelled pointer (gesture stolen, window blurred) abandons the drag. */
+  private onPointerCancel(): void {
+    this.detachDocumentListeners();
     this.cancelDrag();
   }
 

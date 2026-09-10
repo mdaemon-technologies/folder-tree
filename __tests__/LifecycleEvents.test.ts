@@ -35,18 +35,20 @@ describe('Lifecycle Events', () => {
     expect(handler).toHaveBeenCalled();
   });
 
-  test('loaded event fires after initialization', () => {
+  test('loaded event fires after initialization', async () => {
     const handler = jest.fn();
     container.addEventListener('loaded.MDFolderTree', handler);
     tree = new MDFolderTree(container, { core: { data: sampleData } });
+    await Promise.resolve();
     expect(handler).toHaveBeenCalled();
   });
 
-  test('ready event fires after loaded', () => {
+  test('ready event fires after loaded', async () => {
     const order: string[] = [];
     container.addEventListener('loaded.MDFolderTree', () => order.push('loaded'));
     container.addEventListener('ready.MDFolderTree', () => order.push('ready'));
     tree = new MDFolderTree(container, { core: { data: sampleData } });
+    await Promise.resolve();
     expect(order).toEqual(['loaded', 'ready']);
   });
 
@@ -121,5 +123,63 @@ describe('Lifecycle Events', () => {
     container.addEventListener('redraw.MDFolderTree', handler);
     tree.redraw();
     expect(handler).toHaveBeenCalled();
+  });
+
+  describe('observability after construction', () => {
+    const data: TreeNodeData[] = [{ id: 'a', text: 'A' }];
+
+    it('should deliver ready to a handler attached after construction', async () => {
+      const tree = new MDFolderTree(container, { core: { data } });
+
+      let fired = 0;
+      tree.on('ready.MDFolderTree', () => { fired++; });
+      await Promise.resolve();
+
+      expect(fired).toBe(1);
+    });
+
+    it('should deliver loaded to a handler attached after construction', async () => {
+      const tree = new MDFolderTree(container, { core: { data } });
+
+      let fired = 0;
+      tree.on('loaded.MDFolderTree', () => { fired++; });
+      await Promise.resolve();
+
+      expect(fired).toBe(1);
+    });
+
+    it('should expose the instance via getInstance inside a ready handler', async () => {
+      const tree = new MDFolderTree(container, { core: { data } });
+
+      let resolved: unknown = 'not-called';
+      tree.on('ready.MDFolderTree', () => {
+        resolved = MDFolderTree.getInstance(container);
+      });
+      await Promise.resolve();
+
+      expect(resolved).toBe(tree);
+    });
+
+    it('should emit ready exactly once', async () => {
+      const tree = new MDFolderTree(container, { core: { data } });
+
+      let fired = 0;
+      tree.on('ready.MDFolderTree', () => { fired++; });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fired).toBe(1);
+    });
+
+    it('should not emit ready if the tree is destroyed first', async () => {
+      const tree = new MDFolderTree(container, { core: { data } });
+
+      let fired = 0;
+      tree.on('ready.MDFolderTree', () => { fired++; });
+      tree.destroy();
+      await Promise.resolve();
+
+      expect(fired).toBe(0);
+    });
   });
 });

@@ -96,17 +96,49 @@ export class CheckboxPlugin implements TreePlugin {
 
   // ---- Full Checkbox API ----
 
+  /** Whether checking a node also selects it (jstree's `tie_selection`). */
+  private get tiesSelection(): boolean {
+    return this.config.tie_selection !== false;
+  }
+
+  /**
+   * The single place a node's checked state changes. Selection is mirrored
+   * through the tree's own API so `TreeSelection` stays authoritative, rather
+   * than writing `state.selected` directly.
+   */
+  private applyChecked(node: TreeNode, checked: boolean): void {
+    node.state.checked = checked;
+
+    if (this.tiesSelection) {
+      if (checked) {
+        this.tree.selectNode(node.id, true);
+      } else {
+        this.tree.deselectNode(node.id, true);
+      }
+    }
+
+    const el = this.tree.getContainer().querySelector(`#${CSS.escape(node.id)}`);
+    if (el) el.classList.toggle('md-tree-checked', checked);
+  }
+
+  /** Single-select mode permits only one checked node at a time. */
+  private uncheckOthers(exceptId: string): void {
+    for (const other of this.tree.getAllNodes()) {
+      if (other.id !== exceptId && other.state.checked) {
+        this.applyChecked(other, false);
+      }
+    }
+  }
+
   check_node(id: string): void {
     const node = this.tree.getNode(id);
     if (!node) return;
 
-    node.state.checked = true;
-    node.state.selected = true;
-    this.tree.selectNode(id, true);
+    if (!(this.tree.config.core?.multiple ?? true)) {
+      this.uncheckOthers(id);
+    }
 
-    const container = this.tree.getContainer();
-    const el = container.querySelector(`#${CSS.escape(id)}`);
-    if (el) el.classList.add('md-tree-checked');
+    this.applyChecked(node, true);
 
     // Cascade down if three_state
     if (this.config.three_state !== false) {
@@ -125,13 +157,7 @@ export class CheckboxPlugin implements TreePlugin {
     const node = this.tree.getNode(id);
     if (!node) return;
 
-    node.state.checked = false;
-    node.state.selected = false;
-    this.tree.deselectNode(id, true);
-
-    const container = this.tree.getContainer();
-    const el = container.querySelector(`#${CSS.escape(id)}`);
-    if (el) el.classList.remove('md-tree-checked');
+    this.applyChecked(node, false);
 
     // Cascade down if three_state
     if (this.config.three_state !== false) {
@@ -147,10 +173,14 @@ export class CheckboxPlugin implements TreePlugin {
   }
 
   check_all(): void {
+    // Disabled nodes are skipped to match `selectAll`; checking one while it
+    // cannot be selected would leave the two states contradicting each other.
     for (const node of this.tree.getAllNodes()) {
+      if (node.state.disabled) continue;
       node.state.checked = true;
-      node.state.selected = true;
     }
+    // Bulk selection in one pass; per-node selection would be O(n^2).
+    if (this.tiesSelection) this.tree.selectAll(true);
     this.tree.redraw();
     this.tree.emit('check_all.MDFolderTree', {});
   }
@@ -158,8 +188,8 @@ export class CheckboxPlugin implements TreePlugin {
   uncheck_all(): void {
     for (const node of this.tree.getAllNodes()) {
       node.state.checked = false;
-      node.state.selected = false;
     }
+    if (this.tiesSelection) this.tree.deselectAll(true);
     this.tree.redraw();
     this.tree.emit('uncheck_all.MDFolderTree', {});
   }
@@ -262,7 +292,6 @@ export class CheckboxPlugin implements TreePlugin {
   }
 
   private cascadeCheck(node: TreeNode, checked: boolean): void {
-    const container = this.tree.getContainer();
     const cascadeToDisabled = this.config.cascade_to_disabled !== false;
     const cascadeToHidden = this.config.cascade_to_hidden !== false;
     for (const childId of node.children) {
@@ -270,21 +299,7 @@ export class CheckboxPlugin implements TreePlugin {
       if (!child) continue;
       if (!cascadeToDisabled && child.state.disabled) continue;
       if (!cascadeToHidden && child.state.hidden) continue;
-      child.state.checked = checked;
-      child.state.selected = checked;
-      if (checked) {
-        this.tree.selectNode(childId, true);
-      } else {
-        this.tree.deselectNode(childId, true);
-      }
-      const childEl = container.querySelector(`#${CSS.escape(childId)}`);
-      if (childEl) {
-        if (checked) {
-          childEl.classList.add('md-tree-checked');
-        } else {
-          childEl.classList.remove('md-tree-checked');
-        }
-      }
+      this.applyChecked(child, checked);
       if (child.children.length > 0) {
         this.cascadeCheck(child, checked);
       }

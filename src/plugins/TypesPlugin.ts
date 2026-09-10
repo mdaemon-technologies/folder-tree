@@ -31,6 +31,10 @@ export class TypesPlugin implements TreePlugin {
   }
 
   onNodeRender(node: TreeNode, element: HTMLElement): void {
+    // An icon set on the node itself is more specific than its type's icon;
+    // the renderer has already applied it.
+    if (typeof node.icon === 'string' && node.icon) return;
+
     const icon = this.getIconForType(node.type);
     const iconEl = element.querySelector('.md-tree-themeicon') as HTMLElement | null;
     if (!iconEl) return;

@@ -77,4 +77,33 @@ describe('ConditionalSelectPlugin', () => {
     if (anchor) anchor.click();
     expect(tree.get_selected()).toContain('n1');
   });
+  it('should prevent default navigation when selection is vetoed', () => {
+    new MDFolderTree(container, {
+      core: { data: sampleData },
+      plugins: ['conditionalselect'],
+      conditionalselect: () => false,
+    });
+
+    const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    anchor.dispatchEvent(event);
+
+    // The anchor carries href="#"; without preventDefault the browser
+    // navigates and the page jumps to the top.
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('should prevent default navigation when selection is allowed', () => {
+    new MDFolderTree(container, {
+      core: { data: sampleData },
+      plugins: ['conditionalselect'],
+      conditionalselect: () => true,
+    });
+
+    const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    anchor.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
 });

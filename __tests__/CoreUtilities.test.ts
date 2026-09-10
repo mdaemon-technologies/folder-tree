@@ -221,4 +221,28 @@ describe('Core Utility Methods', () => {
     // root-1, child-1, grandchild-1, child-2, root-2 = 5
     expect(flat.length).toBe(5);
   });
+
+  describe('get_json flat mode', () => {
+    it('should not nest children when flat is requested', () => {
+      const tree = new MDFolderTree(container, {
+        core: { data: [{ id: 'p', text: 'P', children: [{ id: 'k', text: 'K' }] }] },
+      });
+
+      const flat = tree.get_json(undefined, { flat: true }) as TreeNodeData[];
+
+      expect(flat.map((n) => n.id)).toEqual(['p', 'k']);
+      expect(flat.every((n) => n.children === undefined)).toBe(true);
+    });
+
+    it('should still nest children in the default tree form', () => {
+      const tree = new MDFolderTree(container, {
+        core: { data: [{ id: 'p', text: 'P', children: [{ id: 'k', text: 'K' }] }] },
+      });
+
+      const nested = tree.get_json() as TreeNodeData[];
+
+      expect(nested).toHaveLength(1);
+      expect((nested[0].children as TreeNodeData[])[0].id).toBe('k');
+    });
+  });
 });

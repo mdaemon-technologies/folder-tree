@@ -1,4 +1,5 @@
 import { TypesPlugin } from '../../src/plugins/TypesPlugin';
+import { MDFolderTree } from '../../src/MDFolderTree';
 
 describe('TypesPlugin', () => {
   it('should resolve icon class from type config', () => {
@@ -40,5 +41,43 @@ describe('TypesPlugin', () => {
     } as any);
 
     expect(plugin.getIconForType('hidden')).toBe(false);
+  });
+
+  describe('icon precedence', () => {
+    let container: HTMLElement;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+    });
+
+    afterEach(() => {
+      const instance = MDFolderTree.getInstance(container);
+      if (instance) instance.destroy();
+      container.remove();
+    });
+
+    it('should let an explicit node icon win over its type icon', () => {
+      new MDFolderTree(container, {
+        core: { data: [{ id: 'n', text: 'N', type: 'folder', icon: 'my-node-icon' }] },
+        types: { folder: { icon: 'type-icon' } },
+        plugins: ['types'],
+      });
+
+      const icon = container.querySelector('#n .md-tree-themeicon') as HTMLElement;
+      expect(icon.className).toContain('my-node-icon');
+      expect(icon.className).not.toContain('type-icon');
+    });
+
+    it('should apply the type icon when the node has none', () => {
+      new MDFolderTree(container, {
+        core: { data: [{ id: 'n', text: 'N', type: 'folder' }] },
+        types: { folder: { icon: 'type-icon' } },
+        plugins: ['types'],
+      });
+
+      const icon = container.querySelector('#n .md-tree-themeicon') as HTMLElement;
+      expect(icon.className).toContain('type-icon');
+    });
   });
 });

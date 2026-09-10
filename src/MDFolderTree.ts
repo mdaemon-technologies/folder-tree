@@ -44,6 +44,12 @@ export class MDFolderTree implements TreePluginHost {
   private destroyed = false;
   private idCounter = 0;
   /**
+   * Owns every listener bound directly to the container. `destroy()` aborts
+   * it, which is the only way these come off — the event bus tracks just the
+   * handlers registered through `on()`.
+   */
+  private listeners = new AbortController();
+  /**
    * Ordered container for top-level nodes. Deliberately kept out of the store
    * so `getAllNodes()` and every consumer of it stay unaffected, while
    * `'#'` still resolves to a real node with an ordered `children` array.
@@ -60,12 +66,17 @@ export class MDFolderTree implements TreePluginHost {
     this.store = new TreeNodeStore();
     this.rootNode = this.createRootNode();
     this.selection = new TreeSelection(this.config.core?.multiple ?? true);
-    this.jsonParser = new JsonParser();
+    this.jsonParser = new JsonParser(() => this.mintId('mdft'));
     this.htmlParser = new HtmlParser();
 
     // Initialize plugins
     this.initPlugins();
-    this.renderer = new TreeRenderer(element, this.plugins, this.config.core?.sanitize_attrs ?? true);
+    this.renderer = new TreeRenderer(
+      element,
+      this.plugins,
+      this.config.core?.sanitize_attrs ?? true,
+      (error) => this.reportError(error),
+    );
 
     // Apply theme classes
     this.applyThemeClasses();
@@ -102,21 +113,20 @@ export class MDFolderTree implements TreePluginHost {
     if (!node || node.state.disabled) return;
 
     const oldSelection = this.selection.getSelected();
-    node.state.selected = true;
     this.selection.select(id);
+    this.syncSelectionFlags();
 
     // Sync checked state when checkbox plugin is active with tie_selection
     if (this.checkboxPlugin && this.config.checkbox?.tie_selection !== false) {
       node.state.checked = true;
     }
 
-    // If single-select, deselect others
+    // If single-select, repaint the nodes that just lost selection
     if (!(this.config.core?.multiple ?? true)) {
       for (const prevId of oldSelection) {
         if (prevId !== id) {
           const prev = this.store.get(prevId);
           if (prev) {
-            prev.state.selected = false;
             if (this.checkboxPlugin && this.config.checkbox?.tie_selection !== false) {
               prev.state.checked = false;
             }
@@ -143,8 +153,8 @@ export class MDFolderTree implements TreePluginHost {
     if (!node) return;
 
     const oldSelection = this.selection.getSelected();
-    node.state.selected = false;
     this.selection.deselect(id);
+    this.syncSelectionFlags();
 
     // Sync checked state when checkbox plugin is active with tie_selection
     if (this.checkboxPlugin && this.config.checkbox?.tie_selection !== false) {
@@ -160,33 +170,37 @@ export class MDFolderTree implements TreePluginHost {
   }
 
   select_all(suppress = false): void {
-    const allIds = this.store.getAllIds();
-    for (const id of allIds) {
-      const node = this.store.get(id);
-      if (node && !node.state.disabled) {
-        node.state.selected = true;
-      }
-    }
-    this.selection.selectAll(allIds.filter((id) => !this.store.get(id)?.state.disabled));
+    const oldSelection = this.selection.getSelected();
+    const selectable = this.store.getAll()
+      .filter((node) => !node.state.disabled)
+      .map((node) => node.id);
+
+    this.selection.selectAll(selectable);
+    this.syncSelectionFlags();
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
 
     if (!suppress) {
-      this.emitChanged('select_all', null, []);
+      this.emitChanged('select_all', null, oldSelection);
     }
   }
 
   deselect_all(suppress = false): void {
     const oldSelection = this.selection.getSelected();
-    for (const id of oldSelection) {
-      const node = this.store.get(id);
-      if (node) node.state.selected = false;
-    }
     this.selection.deselectAll();
+    this.syncSelectionFlags();
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
 
     if (!suppress) {
       this.emitChanged('deselect_all', null, oldSelection);
     }
+  }
+
+  selectAll(suppress = false): void {
+    this.select_all(suppress);
+  }
+
+  deselectAll(suppress = false): void {
+    this.deselect_all(suppress);
   }
 
   get_selected(): string[] {
@@ -381,6 +395,7 @@ export class MDFolderTree implements TreePluginHost {
     const old = this.themeName;
     this.element.classList.remove(`md-tree-${old}`);
     this.themeName = name;
+    this.renderer.setThemeName(name);
     this.element.classList.add(`md-tree-${name}`);
     this.emit(`set_theme.${EVENT_NS}`, { theme: name });
   }
@@ -412,7 +427,6 @@ export class MDFolderTree implements TreePluginHost {
     // Close all first
     for (const node of this.store.getAll()) {
       node.state.opened = false;
-      node.state.selected = false;
     }
     this.selection.deselectAll();
 
@@ -427,13 +441,12 @@ export class MDFolderTree implements TreePluginHost {
     // Restore selected
     if (state.selected) {
       for (const id of state.selected) {
-        const node = this.store.get(id);
-        if (node) {
-          node.state.selected = true;
+        if (this.store.has(id)) {
           this.selection.select(id);
         }
       }
     }
+    this.syncSelectionFlags();
 
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
     this.emit(`set_state.${EVENT_NS}`, { state });
@@ -468,6 +481,12 @@ export class MDFolderTree implements TreePluginHost {
     for (const plugin of this.plugins) {
       plugin.destroy();
     }
+
+    // Detach every listener bound directly to the container.
+    this.listeners.abort();
+
+    this.setFocused(null);
+    this.buffer = null;
 
     this.eventBus.destroy();
     this.store.clear();
@@ -587,9 +606,9 @@ export class MDFolderTree implements TreePluginHost {
     newParent.children.splice(pos, 0, id);
     newParent.children_d.push(id);
 
-    // Update node's parent references
+    // Update node's parent reference; derived ancestry is rebuilt below.
     node.parent = parentId;
-    node.parents = this.buildParentChain(parentId);
+    this.reindex();
 
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
     this.emit(`move_node.${EVENT_NS}`, { node, parent: parentId, position, old_parent: oldParent?.id ?? '#' });
@@ -613,7 +632,7 @@ export class MDFolderTree implements TreePluginHost {
 
     const pos = Math.min(position, newParent.children.length);
     newParent.children.splice(pos, 0, newId);
-    newParent.children_d.push(newId);
+    this.reindex();
 
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
     this.emit(`copy_node.${EVENT_NS}`, { node: copy, original, parent: parentId, position });
@@ -704,6 +723,7 @@ export class MDFolderTree implements TreePluginHost {
       this.store.delete(nid);
     };
     removeRecursive(id);
+    this.reindex();
 
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
     this.emit(`delete_node.${EVENT_NS}`, { node, parent: parent?.id ?? '#' });
@@ -723,7 +743,7 @@ export class MDFolderTree implements TreePluginHost {
 
     const node: TreeNode = {
       id: data.id || this.mintId('new'),
-      text: data.text,
+      text: data.text ?? '',
       icon: data.icon ?? false,
       type: data.type ?? 'default',
       parent: parentId,
@@ -747,17 +767,26 @@ export class MDFolderTree implements TreePluginHost {
 
     const pos = position != null ? Math.min(position, parent.children.length) : parent.children.length;
     parent.children.splice(pos, 0, node.id);
-    parent.children_d.push(node.id);
+    this.reindex();
 
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
     this.emit(`create_node.${EVENT_NS}`, { node, parent: parentId, position });
     return node;
   }
 
-  reorderChildren(parentId: string, childIds: string[]): void {
+  /**
+   * Reorder a parent's children in the model without rendering. Kept separate
+   * from `reorderChildren` so render-time hooks can adjust ordering without
+   * re-entering the renderer.
+   */
+  setChildOrder(parentId: string, childIds: string[]): void {
     const parent = this.resolveParent(parentId);
     if (!parent) return;
     parent.children = childIds;
+  }
+
+  reorderChildren(parentId: string, childIds: string[]): void {
+    this.setChildOrder(parentId, childIds);
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
   }
 
@@ -807,7 +836,7 @@ export class MDFolderTree implements TreePluginHost {
   get_json(id?: string, options?: { flat?: boolean; no_state?: boolean; no_id?: boolean; no_children?: boolean; no_data?: boolean }): TreeNodeData | TreeNodeData[] | false {
     const opts = options ?? {};
 
-    const serializeNode = (node: TreeNode): TreeNodeData => {
+    const serializeNode = (node: TreeNode, includeChildren = true): TreeNodeData => {
       const result: TreeNodeData = {
         id: opts.no_id ? '' : node.id,
         text: node.text,
@@ -824,8 +853,11 @@ export class MDFolderTree implements TreePluginHost {
       }
       if (Object.keys(node.li_attr).length > 0) result.li_attr = { ...node.li_attr };
       if (Object.keys(node.a_attr).length > 0) result.a_attr = { ...node.a_attr };
-      if (!opts.no_children && node.children.length > 0) {
-        result.children = node.children.map((cid) => serializeNode(this.store.get(cid)!)).filter(Boolean);
+      if (includeChildren && !opts.no_children && node.children.length > 0) {
+        result.children = node.children
+          .map((cid) => this.store.get(cid))
+          .filter((child): child is TreeNode => child !== null)
+          .map((child) => serializeNode(child));
       }
       return result;
     };
@@ -835,7 +867,9 @@ export class MDFolderTree implements TreePluginHost {
       if (opts.flat) {
         const flat: TreeNodeData[] = [];
         const walk = (n: TreeNode) => {
-          flat.push(serializeNode(n));
+          // Flat output lists every node once; nesting them as well would
+          // duplicate the whole tree inside its own first entry.
+          flat.push(serializeNode(n, false));
           for (const cid of n.children) {
             const child = this.store.get(cid);
             if (child) walk(child);
@@ -844,7 +878,9 @@ export class MDFolderTree implements TreePluginHost {
         for (const root of roots) walk(root);
         return flat;
       }
-      return roots.map(serializeNode);
+      // Wrapped rather than passed by reference: `map` supplies an index,
+      // which would bind to `includeChildren`.
+      return roots.map((root) => serializeNode(root));
     }
 
     const node = this.store.get(id);
@@ -1011,9 +1047,9 @@ export class MDFolderTree implements TreePluginHost {
       const child = this.store.get(cid);
       if (child) {
         child.parent = newId;
-        child.parents = child.parents.map((p) => p === id ? newId : p);
       }
     }
+    this.reindex();
 
     // Update selection
     if (this.selection.isSelected(id)) {
@@ -1370,11 +1406,11 @@ export class MDFolderTree implements TreePluginHost {
 
   private getLastVisibleNodeId(): string | null {
     const all = this.element.querySelectorAll('.md-tree-node:not(.md-tree-hidden)');
-    // Find last visible (not inside a closed parent)
+    // Find the last node that no collapsed *ancestor* is hiding. Searching
+    // from the node itself would reject every closed parent, which is visible.
     for (let i = all.length - 1; i >= 0; i--) {
       const el = all[i] as HTMLElement;
-      // Check if visible (not inside a closed node)
-      if (el.offsetParent !== null || el.closest('.md-tree-closed') === null) {
+      if (!el.parentElement?.closest('.md-tree-closed')) {
         return el.id;
       }
     }
@@ -1444,7 +1480,7 @@ export class MDFolderTree implements TreePluginHost {
           if (!node || node.state.disabled) break;
           if (!this.invokeBeforeActivate(node, e)) break;
           if (this.checkboxPlugin) {
-            this.toggleChecked(currentId);
+            this.toggleNodeChecked(currentId, e);
           } else if (node.state.selected && (this.config.core?.multiple ?? true)) {
             this.deselectNode(currentId);
           } else {
@@ -1509,7 +1545,7 @@ export class MDFolderTree implements TreePluginHost {
           break;
         }
       }
-    });
+    }, { signal: this.listeners.signal });
 
     // Set initial focus on click
     this.element.addEventListener('click', () => {
@@ -1517,7 +1553,7 @@ export class MDFolderTree implements TreePluginHost {
       if (selected.length > 0 && !this.focusedId) {
         this.setFocused(selected[0]);
       }
-    });
+    }, { signal: this.listeners.signal });
   }
 
   // ---- Refresh & Load (Phase 8) ----
@@ -1535,24 +1571,26 @@ export class MDFolderTree implements TreePluginHost {
     this.rootNode.children_d = [];
     this.selection.deselectAll();
 
-    // Reload
-    this.loadData();
+    // Reload. State is restored in the completion hook because a
+    // `DataCallback` populates the store asynchronously.
+    this.loadData({
+      emitLifecycle: false,
+      onComplete: () => {
+        for (const id of openedIds) {
+          const node = this.store.get(id);
+          if (node) node.state.opened = true;
+        }
+        for (const id of selectedIds) {
+          if (this.store.has(id)) {
+            this.selection.select(id);
+          }
+        }
+        this.syncSelectionFlags();
 
-    // Restore state
-    for (const id of openedIds) {
-      const node = this.store.get(id);
-      if (node) node.state.opened = true;
-    }
-    for (const id of selectedIds) {
-      const node = this.store.get(id);
-      if (node) {
-        node.state.selected = true;
-        this.selection.select(id);
-      }
-    }
-
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
-    this.emit(`refresh.${EVENT_NS}`, {});
+        this.renderer.render(this.getRootNodes(), this.getNodeMap());
+        this.emit(`refresh.${EVENT_NS}`, {});
+      },
+    });
   }
 
   load_node(id: string, callback?: (node: TreeNode, status: boolean) => void): boolean {
@@ -1569,7 +1607,29 @@ export class MDFolderTree implements TreePluginHost {
     node.state.loaded = false;
     this.renderer.renderSingleNode(node, this.getNodeMap());
 
-    (coreData as DataCallback)(node, (data: TreeNodeData[]) => {
+    const settle = (): void => {
+      node.state.loading = false;
+      this.renderer.renderSingleNode(node, this.getNodeMap());
+    };
+
+    try {
+      this.invokeDataCallback(coreData as DataCallback, node, callback);
+    } catch (cause) {
+      this.reportError({ error: 'load_failed', operation: 'load_node', id, cause });
+      settle();
+      if (callback) callback(node, false);
+      return false;
+    }
+
+    return true;
+  }
+
+  private invokeDataCallback(
+    coreData: DataCallback,
+    node: TreeNode,
+    callback?: (node: TreeNode, status: boolean) => void,
+  ): void {
+    coreData(node, (data: TreeNodeData[]) => {
       // Clear existing children
       for (const cid of [...node.children]) {
         this.removeSubtree(cid);
@@ -1577,8 +1637,10 @@ export class MDFolderTree implements TreePluginHost {
       node.children = [];
       node.children_d = [];
 
-      // Parse and add new children
-      this.buildNodeTree(data, node.id);
+      // Parse and add new children through the same normalization the
+      // initial load uses, so defaults and generated ids are applied.
+      this.buildNodeTree(this.jsonParser.parse(data), node.id);
+      this.reindex();
 
       node.state.loading = false;
       node.state.loaded = true;
@@ -1587,8 +1649,6 @@ export class MDFolderTree implements TreePluginHost {
       this.emit(`load_node.${EVENT_NS}`, { node });
       if (callback) callback(node, true);
     });
-
-    return true;
   }
 
   load_all(id?: string, callback?: () => void): void {
@@ -1694,72 +1754,32 @@ export class MDFolderTree implements TreePluginHost {
     }
   }
 
-  private toggleChecked(id: string): void {
+  /**
+   * Checkbox-mode activation. Delegates to CheckboxPlugin — the single owner
+   * of cascade, `tie_selection` and the `cascade_to_*` options — then emits
+   * the selection-change events the core is responsible for.
+   */
+  private toggleNodeChecked(id: string, event?: Event): void {
+    const plugin = this.checkboxPlugin;
+    if (!plugin) return;
     const node = this.store.get(id);
     if (!node) return;
 
-    const newChecked = !node.state.checked;
-    const threeState = this.config.checkbox?.three_state !== false;
+    const oldSelection = this.selection.getSelected();
+    const willCheck = !node.state.checked;
 
-    // If single-select, uncheck all others first
-    if (!(this.config.core?.multiple ?? true) && newChecked) {
-      for (const n of this.store.getAll()) {
-        if (n.id !== id && n.state.checked) {
-          n.state.checked = false;
-          n.state.selected = false;
-          this.selection.deselect(n.id);
-          const el = this.element.querySelector(`#${CSS.escape(n.id)}`);
-          if (el) el.classList.remove('md-tree-checked');
-        }
-      }
-    }
-
-    // Toggle the clicked node
-    this.setChecked(id, newChecked);
-
-    // Cascade to children if three_state
-    if (threeState && node.children.length > 0) {
-      this.cascadeChecked(node.children, newChecked);
-    }
-
-    // Update parent undetermined state
-    if (node.parent && node.parent !== '#' && this.checkboxPlugin) {
-      this.checkboxPlugin.updateUndetermined(node.parent);
-    }
-
-    this.emit(`select_node.${EVENT_NS}`, { node, selected: this.selection.getSelected() });
-  }
-
-  private setChecked(id: string, checked: boolean): void {
-    const node = this.store.get(id);
-    if (!node) return;
-
-    node.state.checked = checked;
-    node.state.selected = checked;
-
-    if (checked) {
-      this.selection.select(id);
+    if (willCheck) {
+      plugin.check_node(id);
     } else {
-      this.selection.deselect(id);
+      plugin.uncheck_node(id);
     }
 
-    const nodeEl = this.element.querySelector(`#${CSS.escape(id)}`);
-    if (nodeEl) {
-      if (checked) {
-        nodeEl.classList.add('md-tree-checked');
-      } else {
-        nodeEl.classList.remove('md-tree-checked');
-      }
-    }
-  }
-
-  private cascadeChecked(childIds: string[], checked: boolean): void {
-    for (const childId of childIds) {
-      this.setChecked(childId, checked);
-      const child = this.store.get(childId);
-      if (child && child.children.length > 0) {
-        this.cascadeChecked(child.children, checked);
-      }
+    // Selection events only make sense while checking is tied to selection.
+    if (this.config.checkbox?.tie_selection !== false) {
+      const selected = this.selection.getSelected();
+      const action = willCheck ? 'select_node' : 'deselect_node';
+      this.emit(`${action}.${EVENT_NS}`, { node, selected, event });
+      this.emitChanged(action, node, oldSelection);
     }
   }
 
@@ -1841,153 +1861,142 @@ export class MDFolderTree implements TreePluginHost {
     }
   }
 
-  private loadData(): void {
+  /**
+   * @param options.onComplete Runs once the data is in the store. With a
+   * `DataCallback` this is asynchronous, so callers that need to act on the
+   * loaded tree must use it rather than the return of this method.
+   * @param options.emitLifecycle Suppressed by `refresh()`, which emits its
+   * own event; re-emitting `ready` would re-trigger plugins that restore state.
+   */
+  private loadData(options: { onComplete?: () => void; emitLifecycle?: boolean } = {}): void {
+    const { onComplete, emitLifecycle = true } = options;
     const coreData = this.config.core?.data;
 
-    this.emit(`loading.${EVENT_NS}`, {});
+    const finish = (): void => {
+      if (emitLifecycle) {
+        // Deferred by a microtask: for synchronous data these would otherwise
+        // fire before the constructor returns, so no consumer could ever
+        // subscribe in time to observe them.
+        queueMicrotask(() => {
+          if (this.destroyed) return;
+          this.emit(`loaded.${EVENT_NS}`, {});
+          this.emit(`ready.${EVENT_NS}`, { instance: this });
+        });
+      }
+      onComplete?.();
+    };
+
+    if (emitLifecycle) this.emit(`loading.${EVENT_NS}`, {});
+
+    // Registered up front so `MDFolderTree.getInstance()` resolves inside a
+    // `ready` handler.
+    (this.element as unknown as Record<string, unknown>).__mdFolderTree = this;
 
     if (typeof coreData === 'function') {
       // Pattern A: data callback
       (coreData as DataCallback)(this.rootNode, (data: TreeNodeData[]) => {
         const parsed = this.jsonParser.parse(data);
         this.buildNodeTree(parsed, '#');
+        this.reindex();
+        this.syncSelectionFlags();
         this.renderer.render(this.getRootNodes(), this.getNodeMap());
-        this.emit(`loaded.${EVENT_NS}`, {});
-        this.emit(`ready.${EVENT_NS}`, { instance: this });
+        finish();
       });
     } else if (Array.isArray(coreData)) {
       // Pattern A variant: static JSON array
       const parsed = this.jsonParser.parse(coreData);
       this.buildNodeTree(parsed, '#');
+      this.reindex();
+      this.syncSelectionFlags();
       this.renderer.render(this.getRootNodes(), this.getNodeMap());
-      this.emit(`loaded.${EVENT_NS}`, {});
-      this.emit(`ready.${EVENT_NS}`, { instance: this });
+      finish();
     } else {
       // Pattern B: parse existing HTML
-      const parsed = this.htmlParser.parse(this.element);
+      const parsed = this.jsonParser.parse(this.htmlParser.parse(this.element));
       if (parsed.length > 0) {
         this.buildNodeTree(parsed, '#');
+        this.reindex();
+        this.syncSelectionFlags();
         this.renderer.render(this.getRootNodes(), this.getNodeMap());
       }
-      this.emit(`loaded.${EVENT_NS}`, {});
-      this.emit(`ready.${EVENT_NS}`, { instance: this });
+      finish();
     }
 
-    // Store instance reference on element
-    (this.element as unknown as Record<string, unknown>).__mdFolderTree = this;
   }
 
+  /**
+   * Materialize normalized data into the store beneath `parentId`.
+   *
+   * Runs in two passes so a node may name a parent that appears later in the
+   * payload (jstree's flat format). Nested `children` arrays and flat `parent`
+   * references are handled by the same code: a node's parent is whatever its
+   * `parent` property says, defaulting to the enclosing `parentId`.
+   */
   private buildNodeTree(data: TreeNodeData[], parentId: string): void {
-    // Check if this is a flat array with parent references (jstree-style)
-    const hasParentRefs = data.some(
-      (n) => typeof n.parent === 'string' && n.parent !== parentId
-    );
+    // Pass 1: create every node, so forward parent references resolve.
+    const accepted: TreeNodeData[] = [];
+    for (const raw of data) {
+      if (this.store.has(raw.id)) {
+        this.reportError({ error: 'duplicate_id', operation: 'load', id: raw.id, parent: parentId });
+        continue;
+      }
+      this.store.set(raw.id, this.materializeNode(raw, (raw.parent as string) ?? parentId));
+      accepted.push(raw);
+    }
 
-    if (hasParentRefs) {
-      // Two-pass approach for flat arrays with parent references
-      // Pass 1: Create all nodes in the store
-      const accepted: TreeNodeData[] = [];
-      for (const raw of data) {
-        if (this.store.has(raw.id)) {
-          this.reportError({ error: 'duplicate_id', operation: 'load', id: raw.id });
-          continue;
-        }
-        const nodeParent = (raw.parent as string) ?? parentId;
-        const node: TreeNode = {
-          id: raw.id,
-          text: raw.text,
-          icon: raw.icon ?? false,
-          type: raw.type ?? 'default',
-          parent: nodeParent,
-          parents: [],
-          children: [],
-          children_d: [],
-          state: {
-            opened: raw.state?.opened ?? false,
-            selected: raw.state?.selected ?? false,
-            disabled: raw.state?.disabled ?? false,
-            loaded: raw.children !== true,
-            loading: false,
-            checked: raw.state?.checked ?? false,
-          },
-          li_attr: raw.li_attr ?? {},
-          a_attr: raw.a_attr ?? {},
-          original: raw,
-        };
+    // Pass 2: attach to parents and recurse into nested children.
+    for (const raw of accepted) {
+      const node = this.store.get(raw.id)!;
 
-        this.store.set(node.id, node);
-        accepted.push(raw);
+      // A parent named but never supplied would leave the node attached to
+      // nothing and silently unrenderable; rescue it to the root instead.
+      let parent = this.resolveParent(node.parent);
+      if (!parent) {
+        this.reportError({
+          error: 'missing_parent',
+          operation: 'load',
+          id: node.id,
+          parent: node.parent,
+        });
+        node.parent = '#';
+        parent = this.rootNode;
+      }
+      parent.children.push(node.id);
+      parent.children_d.push(node.id);
 
-        if (node.state.selected) {
-          this.selection.select(node.id);
-        }
+      if (node.state.selected) {
+        this.selection.select(node.id);
       }
 
-      // Pass 2: Wire up parent-child relationships
-      for (const raw of accepted) {
-        const node = this.store.get(raw.id)!;
-        const nodeParent = (raw.parent as string) ?? parentId;
-
-        const parent = this.resolveParent(nodeParent);
-        if (parent) {
-          parent.children.push(node.id);
-          parent.children_d.push(node.id);
-        }
-
-        node.parents = this.buildParentChain(nodeParent);
-
-        if (Array.isArray(raw.children)) {
-          this.buildNodeTree(raw.children, node.id);
-        }
-      }
-    } else {
-      // Original behavior: all items are children of parentId
-      for (const raw of data) {
-        if (this.store.has(raw.id)) {
-          this.reportError({ error: 'duplicate_id', operation: 'load', id: raw.id, parent: parentId });
-          continue;
-        }
-        const node: TreeNode = {
-          id: raw.id,
-          text: raw.text,
-          icon: raw.icon ?? false,
-          type: raw.type ?? 'default',
-          parent: parentId,
-          parents: [],
-          children: [],
-          children_d: [],
-          state: {
-            opened: raw.state?.opened ?? false,
-            selected: raw.state?.selected ?? false,
-            disabled: raw.state?.disabled ?? false,
-            loaded: raw.children !== true,
-            loading: false,
-            checked: raw.state?.checked ?? false,
-          },
-          li_attr: raw.li_attr ?? {},
-          a_attr: raw.a_attr ?? {},
-          original: raw,
-        };
-
-        this.store.set(node.id, node);
-
-        if (node.state.selected) {
-          this.selection.select(node.id);
-        }
-
-        const parent = this.resolveParent(parentId);
-        if (parent) {
-          parent.children.push(node.id);
-          parent.children_d.push(node.id);
-        }
-
-        node.parents = this.buildParentChain(parentId);
-
-        if (Array.isArray(raw.children)) {
-          this.buildNodeTree(raw.children, node.id);
-        }
+      if (Array.isArray(raw.children)) {
+        this.buildNodeTree(raw.children, node.id);
       }
     }
+  }
+
+  /** Build the internal node representation from normalized raw data. */
+  private materializeNode(raw: TreeNodeData, parentId: string): TreeNode {
+    return {
+      id: raw.id,
+      text: raw.text,
+      icon: raw.icon ?? false,
+      type: raw.type ?? 'default',
+      parent: parentId,
+      parents: [],
+      children: [],
+      children_d: [],
+      state: {
+        opened: raw.state?.opened ?? false,
+        selected: raw.state?.selected ?? false,
+        disabled: raw.state?.disabled ?? false,
+        loaded: raw.children !== true,
+        loading: false,
+        checked: raw.state?.checked ?? false,
+      },
+      li_attr: raw.li_attr ?? {},
+      a_attr: raw.a_attr ?? {},
+      original: raw,
+    };
   }
 
   private buildParentChain(parentId: string): string[] {
@@ -2005,6 +2014,60 @@ export class MDFolderTree implements TreePluginHost {
     }
     chain.push('#');
     return chain;
+  }
+
+  /**
+   * Rebuild derived ancestry (`parents`, `children_d`) for the whole tree.
+   *
+   * These were previously patched by hand at each mutation site, which drifted:
+   * descendants kept stale ancestry after a move and `children_d` never held
+   * anything deeper than direct children. A whole-tree pass is O(n) — the same
+   * order as the re-render every structural change already performs.
+   */
+  private reindex(): void {
+    const seen = new Set<string>();
+
+    const visit = (id: string, ancestors: string[]): string[] => {
+      const node = this.store.get(id);
+      if (!node || seen.has(id)) return [];
+      seen.add(id);
+
+      node.parents = [...ancestors];
+
+      const descendants: string[] = [];
+      const childAncestors = [id, ...ancestors];
+      for (const childId of node.children) {
+        descendants.push(childId, ...visit(childId, childAncestors));
+      }
+      node.children_d = descendants;
+      return descendants;
+    };
+
+    const all: string[] = [];
+    for (const rootId of this.rootNode.children) {
+      all.push(rootId, ...visit(rootId, ['#']));
+    }
+    this.rootNode.children_d = all;
+
+    // Nodes unreachable from the root — only possible when input data is
+    // cyclic — still need a bounded ancestor chain.
+    for (const node of this.store.getAll()) {
+      if (!seen.has(node.id)) {
+        node.parents = this.buildParentChain(node.parent);
+      }
+    }
+  }
+
+  /**
+   * Refresh the `state.selected` mirror on every node from the authoritative
+   * selection set. `TreeSelection` owns membership and enforces
+   * `core.multiple`; the per-node flag is derived from it and must never be
+   * written directly.
+   */
+  private syncSelectionFlags(): void {
+    for (const node of this.store.getAll()) {
+      node.state.selected = this.selection.isSelected(node.id);
+    }
   }
 
   /**
@@ -2103,6 +2166,10 @@ export class MDFolderTree implements TreePluginHost {
       // Node selection via anchor click
       const anchor = target.closest('.md-tree-anchor') as HTMLElement | null;
       if (anchor) {
+        // The anchor carries href="#": suppress navigation up front, before
+        // any early return, so a vetoed activation cannot jump the page.
+        e.preventDefault();
+
         const li = anchor.closest('.md-tree-node') as HTMLElement | null;
         if (li) {
           const node = this.store.get(li.id);
@@ -2114,7 +2181,7 @@ export class MDFolderTree implements TreePluginHost {
 
             if (this.checkboxPlugin) {
               // Checkbox mode: toggle checked state
-              this.toggleChecked(li.id);
+              this.toggleNodeChecked(li.id, e);
             } else if (node.state.selected && (this.config.core?.multiple ?? true)) {
               this.deselectNode(li.id);
             } else {
@@ -2122,9 +2189,8 @@ export class MDFolderTree implements TreePluginHost {
             }
           }
         }
-        e.preventDefault();
       }
-    });
+    }, { signal: this.listeners.signal });
 
     // Double-click
     this.element.addEventListener('dblclick', (e: MouseEvent) => {
@@ -2145,7 +2211,7 @@ export class MDFolderTree implements TreePluginHost {
           }
         }
       }
-    });
+    }, { signal: this.listeners.signal });
 
     // Hover
     this.element.addEventListener('mouseenter', (e: MouseEvent) => {
@@ -2158,7 +2224,7 @@ export class MDFolderTree implements TreePluginHost {
           if (node) this.emit(`hover_node.${EVENT_NS}`, { node });
         }
       }
-    }, true);
+    }, { capture: true, signal: this.listeners.signal });
 
     this.element.addEventListener('mouseleave', (e: MouseEvent) => {
       const anchor = (e.target as HTMLElement).closest?.('.md-tree-anchor') as HTMLElement | null;
@@ -2170,7 +2236,7 @@ export class MDFolderTree implements TreePluginHost {
           if (node) this.emit(`dehover_node.${EVENT_NS}`, { node });
         }
       }
-    }, true);
+    }, { capture: true, signal: this.listeners.signal });
   }
 
   private emitChanged(action: string, node: TreeNode | null, oldSelection: string[]): void {
@@ -2221,7 +2287,20 @@ export class MDFolderTree implements TreePluginHost {
 
   private invokeBeforeActivate(node: TreeNode, event?: Event): boolean {
     for (const plugin of this.plugins) {
-      if (plugin.onBeforeActivate && !plugin.onBeforeActivate(node, event)) {
+      if (!plugin.onBeforeActivate) continue;
+      try {
+        if (!plugin.onBeforeActivate(node, event)) return false;
+      } catch (cause) {
+        // A veto hook that throws states no intent. Fail closed: refusing
+        // activation is visible and debuggable, whereas proceeding would
+        // silently do the thing the hook may have meant to block.
+        this.reportError({
+          error: 'plugin_hook',
+          hook: 'onBeforeActivate',
+          plugin: plugin.name,
+          id: node.id,
+          cause,
+        });
         return false;
       }
     }

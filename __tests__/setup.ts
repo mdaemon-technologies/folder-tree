@@ -15,3 +15,22 @@ if (typeof CSS === 'undefined') {
 if (typeof HTMLElement !== 'undefined' && !HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = function () {};
 }
+
+// Polyfill PointerEvent for jsdom (used by the dnd plugin)
+if (typeof PointerEvent === 'undefined') {
+  (globalThis as unknown as Record<string, unknown>).PointerEvent =
+    class PointerEvent extends MouseEvent {
+      readonly pointerId: number;
+      readonly pointerType: string;
+      constructor(type: string, params: PointerEventInit = {}) {
+        super(type, params);
+        this.pointerId = params.pointerId ?? 0;
+        this.pointerType = params.pointerType ?? '';
+      }
+    };
+}
+
+// Polyfill document.elementFromPoint for jsdom
+if (typeof document.elementFromPoint !== 'function') {
+  document.elementFromPoint = () => null;
+}
