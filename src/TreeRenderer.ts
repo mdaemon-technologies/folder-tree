@@ -12,12 +12,18 @@ export class TreeRenderer {
   private plugins: TreePlugin[] = [];
   private sanitizeAttrs: boolean;
 
-  constructor(container: HTMLElement, plugins: TreePlugin[] = [], sanitizeAttrs = false) {
+  constructor(container: HTMLElement, plugins: TreePlugin[] = [], sanitizeAttrs = true) {
     this.container = container;
     this.plugins = plugins;
     this.sanitizeAttrs = sanitizeAttrs;
   }
 
+  /**
+   * Event-handler attributes execute consumer-supplied strings as script, so
+   * they are stripped unless `core.sanitize_attrs` is explicitly disabled.
+   * Other attributes are inert on the tags this renderer emits
+   * (`li`, `a`, `i`, `span`, `ul`), and `href` is never taken from `a_attr`.
+   */
   private isUnsafeAttr(key: string): boolean {
     return /^on/i.test(key);
   }

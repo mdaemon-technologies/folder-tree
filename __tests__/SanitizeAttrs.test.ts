@@ -25,57 +25,115 @@ describe('sanitize_attrs option', () => {
     },
   ];
 
-  it('should allow on* attributes when sanitize_attrs is false (default)', () => {
-    new MDFolderTree(container, {
-      core: { data: dataWithEventAttrs },
+  describe('default behavior', () => {
+    it('should strip on* attributes by default', () => {
+      new MDFolderTree(container, {
+        core: { data: dataWithEventAttrs },
+      });
+
+      const li = container.querySelector('#node-1') as HTMLElement;
+      expect(li.getAttribute('onclick')).toBeNull();
+      expect(li.getAttribute('onmouseover')).toBeNull();
+
+      const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
+      expect(anchor.getAttribute('onfocus')).toBeNull();
     });
 
-    const li = container.querySelector('#node-1') as HTMLElement;
-    expect(li.getAttribute('onclick')).toBe('alert(1)');
-    expect(li.getAttribute('onmouseover')).toBe('evil()');
-    expect(li.getAttribute('data-custom')).toBe('safe');
+    it('should preserve non-event attributes by default', () => {
+      new MDFolderTree(container, {
+        core: { data: dataWithEventAttrs },
+      });
 
-    const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
-    expect(anchor.getAttribute('onfocus')).toBe('steal()');
-    expect(anchor.getAttribute('title')).toBe('safe-title');
-    expect(anchor.getAttribute('data-info')).toBe('ok');
+      const li = container.querySelector('#node-1') as HTMLElement;
+      expect(li.getAttribute('data-custom')).toBe('safe');
+
+      const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
+      expect(anchor.getAttribute('title')).toBe('safe-title');
+      expect(anchor.getAttribute('data-info')).toBe('ok');
+    });
+
+    it('should strip on* attributes after a redraw', () => {
+      const tree = new MDFolderTree(container, {
+        core: { data: dataWithEventAttrs },
+      });
+
+      tree.redraw();
+
+      const li = container.querySelector('#node-1') as HTMLElement;
+      expect(li.getAttribute('onclick')).toBeNull();
+    });
   });
 
-  it('should strip on* attributes when sanitize_attrs is true', () => {
-    new MDFolderTree(container, {
-      core: { data: dataWithEventAttrs, sanitize_attrs: true },
+  describe('explicit opt-out', () => {
+    it('should allow on* attributes only when sanitize_attrs is explicitly false', () => {
+      new MDFolderTree(container, {
+        core: { data: dataWithEventAttrs, sanitize_attrs: false },
+      });
+
+      const li = container.querySelector('#node-1') as HTMLElement;
+      expect(li.getAttribute('onclick')).toBe('alert(1)');
+      expect(li.getAttribute('onmouseover')).toBe('evil()');
+      expect(li.getAttribute('data-custom')).toBe('safe');
+
+      const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
+      expect(anchor.getAttribute('onfocus')).toBe('steal()');
+      expect(anchor.getAttribute('title')).toBe('safe-title');
     });
-
-    const li = container.querySelector('#node-1') as HTMLElement;
-    expect(li.getAttribute('onclick')).toBeNull();
-    expect(li.getAttribute('onmouseover')).toBeNull();
-    expect(li.getAttribute('data-custom')).toBe('safe');
-
-    const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
-    expect(anchor.getAttribute('onfocus')).toBeNull();
-    expect(anchor.getAttribute('title')).toBe('safe-title');
-    expect(anchor.getAttribute('data-info')).toBe('ok');
   });
 
-  it('should be case-insensitive for on* attribute filtering', () => {
-    const data: TreeNodeData[] = [
-      {
-        id: 'node-ci',
-        text: 'Case test',
-        li_attr: { ONCLICK: 'bad()', OnMouseOver: 'bad2()' },
-        a_attr: { ONFOCUS: 'bad3()' },
-      },
-    ];
+  describe('explicit opt-in', () => {
+    it('should strip on* attributes when sanitize_attrs is true', () => {
+      new MDFolderTree(container, {
+        core: { data: dataWithEventAttrs, sanitize_attrs: true },
+      });
 
-    new MDFolderTree(container, {
-      core: { data, sanitize_attrs: true },
+      const li = container.querySelector('#node-1') as HTMLElement;
+      expect(li.getAttribute('onclick')).toBeNull();
+      expect(li.getAttribute('onmouseover')).toBeNull();
+      expect(li.getAttribute('data-custom')).toBe('safe');
+
+      const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
+      expect(anchor.getAttribute('onfocus')).toBeNull();
+      expect(anchor.getAttribute('title')).toBe('safe-title');
+      expect(anchor.getAttribute('data-info')).toBe('ok');
     });
 
-    const li = container.querySelector('#node-ci') as HTMLElement;
-    expect(li.getAttribute('ONCLICK')).toBeNull();
-    expect(li.getAttribute('OnMouseOver')).toBeNull();
+    it('should be case-insensitive for on* attribute filtering', () => {
+      const data: TreeNodeData[] = [
+        {
+          id: 'node-ci',
+          text: 'Case test',
+          li_attr: { ONCLICK: 'bad()', OnMouseOver: 'bad2()' },
+          a_attr: { ONFOCUS: 'bad3()' },
+        },
+      ];
 
-    const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
-    expect(anchor.getAttribute('ONFOCUS')).toBeNull();
+      new MDFolderTree(container, {
+        core: { data, sanitize_attrs: true },
+      });
+
+      const li = container.querySelector('#node-ci') as HTMLElement;
+      expect(li.getAttribute('ONCLICK')).toBeNull();
+      expect(li.getAttribute('OnMouseOver')).toBeNull();
+
+      const anchor = li.querySelector('.md-tree-anchor') as HTMLElement;
+      expect(anchor.getAttribute('ONFOCUS')).toBeNull();
+    });
+  });
+
+  describe('attribute value coercion', () => {
+    it('should not throw when an attribute value is not a string', () => {
+      const data = [
+        {
+          id: 'node-coerce',
+          text: 'Coerce',
+          li_attr: { 'data-count': 42 as unknown as string },
+        },
+      ] as TreeNodeData[];
+
+      expect(() => new MDFolderTree(container, { core: { data } })).not.toThrow();
+      const li = container.querySelector('#node-coerce') as HTMLElement;
+      expect(li.getAttribute('data-count')).toBe('42');
+    });
   });
 });

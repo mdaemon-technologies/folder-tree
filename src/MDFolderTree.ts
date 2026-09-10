@@ -42,6 +42,13 @@ export class MDFolderTree implements TreePluginHost {
   private jsonParser: JsonParser;
   private htmlParser: HtmlParser;
   private destroyed = false;
+  private idCounter = 0;
+  /**
+   * Ordered container for top-level nodes. Deliberately kept out of the store
+   * so `getAllNodes()` and every consumer of it stay unaffected, while
+   * `'#'` still resolves to a real node with an ordered `children` array.
+   */
+  private rootNode!: TreeNode;
 
   constructor(element: HTMLElement, config: TreeConfig = {}) {
     if (!element || !element.classList) {
@@ -51,13 +58,14 @@ export class MDFolderTree implements TreePluginHost {
     this.config = this.mergeDefaults(config);
     this.eventBus = new TreeEventBus(element);
     this.store = new TreeNodeStore();
+    this.rootNode = this.createRootNode();
     this.selection = new TreeSelection(this.config.core?.multiple ?? true);
     this.jsonParser = new JsonParser();
     this.htmlParser = new HtmlParser();
 
     // Initialize plugins
     this.initPlugins();
-    this.renderer = new TreeRenderer(element, this.plugins, this.config.core?.sanitize_attrs ?? false);
+    this.renderer = new TreeRenderer(element, this.plugins, this.config.core?.sanitize_attrs ?? true);
 
     // Apply theme classes
     this.applyThemeClasses();
@@ -463,6 +471,8 @@ export class MDFolderTree implements TreePluginHost {
 
     this.eventBus.destroy();
     this.store.clear();
+    this.rootNode.children = [];
+    this.rootNode.children_d = [];
     this.element.classList.remove('md-tree', 'md-tree-default', 'md-tree-checkbox-no-clicked');
     this.element.innerHTML = '';
 
@@ -547,23 +557,35 @@ export class MDFolderTree implements TreePluginHost {
     const node = this.store.get(id);
     if (!node) return false;
 
+    // A node may not become its own ancestor.
+    if (this.wouldCreateCycle(id, parentId)) {
+      this.reportError({ error: 'cycle', operation: 'move_node', id, parent: parentId, position });
+      return false;
+    }
+
+    // Resolve the destination before mutating, so a refused move is a no-op.
+    // Structural validation precedes check_callback so a consumer's callback
+    // is never invoked for an operation that cannot succeed.
+    const newParent = this.resolveParent(parentId);
+    if (!newParent) {
+      this.reportError({ error: 'missing_parent', operation: 'move_node', id, parent: parentId, position });
+      return false;
+    }
+
     // check_callback validation
     if (!this.checkOperation('move_node', node, parentId, position)) return false;
 
     // Remove from old parent
-    const oldParent = this.store.get(node.parent);
+    const oldParent = this.resolveParent(node.parent);
     if (oldParent) {
       oldParent.children = oldParent.children.filter((cid) => cid !== id);
       oldParent.children_d = oldParent.children_d.filter((cid) => cid !== id);
     }
 
     // Add to new parent
-    const newParent = this.store.get(parentId);
-    if (newParent) {
-      const pos = Math.min(position, newParent.children.length);
-      newParent.children.splice(pos, 0, id);
-      newParent.children_d.push(id);
-    }
+    const pos = Math.min(position, newParent.children.length);
+    newParent.children.splice(pos, 0, id);
+    newParent.children_d.push(id);
 
     // Update node's parent references
     node.parent = parentId;
@@ -580,29 +602,69 @@ export class MDFolderTree implements TreePluginHost {
 
     if (!this.checkOperation('copy_node', original, parentId, position)) return false;
 
-    const newId = `${id}_copy_${Date.now()}`;
+    const newParent = this.resolveParent(parentId);
+    if (!newParent) {
+      this.reportError({ error: 'missing_parent', operation: 'copy_node', id, parent: parentId, position });
+      return false;
+    }
+
+    const newId = this.copySubtree(original, parentId, new Set());
+    const copy = this.store.get(newId)!;
+
+    const pos = Math.min(position, newParent.children.length);
+    newParent.children.splice(pos, 0, newId);
+    newParent.children_d.push(newId);
+
+    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.emit(`copy_node.${EVENT_NS}`, { node: copy, original, parent: parentId, position });
+    return newId;
+  }
+
+  /**
+   * Recursively duplicate `source` and its descendants under `parentId`,
+   * minting a fresh id for every node and detaching all mutable objects from
+   * the source. Returns the id of the new subtree root.
+   */
+  private copySubtree(source: TreeNode, parentId: string, seen: Set<string>): string {
+    seen.add(source.id);
+
+    const newId = this.mintId(`${source.id}_copy`);
     const copy: TreeNode = {
-      ...original,
+      ...source,
       id: newId,
       parent: parentId,
       parents: this.buildParentChain(parentId),
       children: [],
       children_d: [],
-      state: { ...original.state, selected: false },
+      state: { ...source.state, selected: false, checked: false },
+      li_attr: { ...source.li_attr },
+      a_attr: { ...source.a_attr },
+      original: this.cloneData(source.original),
     };
-
     this.store.set(newId, copy);
 
-    const newParent = this.store.get(parentId);
-    if (newParent) {
-      const pos = Math.min(position, newParent.children.length);
-      newParent.children.splice(pos, 0, newId);
-      newParent.children_d.push(newId);
+    for (const childId of source.children) {
+      const child = this.store.get(childId);
+      if (!child || seen.has(childId)) continue;
+      const copiedChildId = this.copySubtree(child, newId, seen);
+      copy.children.push(copiedChildId);
+      copy.children_d.push(copiedChildId, ...this.store.get(copiedChildId)!.children_d);
     }
 
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
-    this.emit(`copy_node.${EVENT_NS}`, { node: copy, original, parent: parentId, position });
     return newId;
+  }
+
+  /** Deep-clone consumer-supplied node data, tolerating non-cloneable values. */
+  private cloneData(data: TreeNodeData): TreeNodeData {
+    try {
+      return structuredClone(data);
+    } catch {
+      try {
+        return JSON.parse(JSON.stringify(data)) as TreeNodeData;
+      } catch {
+        return { ...data };
+      }
+    }
   }
 
   renameNode(id: string, text: string): boolean {
@@ -625,7 +687,7 @@ export class MDFolderTree implements TreePluginHost {
     if (!this.checkOperation('delete_node', node, node.parent, 0)) return false;
 
     // Remove from parent
-    const parent = this.store.get(node.parent);
+    const parent = this.resolveParent(node.parent);
     if (parent) {
       parent.children = parent.children.filter((cid) => cid !== id);
       parent.children_d = parent.children_d.filter((cid) => cid !== id);
@@ -649,13 +711,18 @@ export class MDFolderTree implements TreePluginHost {
   }
 
   createNode(parentId: string, data: TreeNodeData, position?: number): TreeNode | false {
-    const parent = parentId === '#' ? null : this.store.get(parentId);
-    if (parentId !== '#' && !parent) return false;
+    const parent = this.resolveParent(parentId);
+    if (!parent) return false;
 
     if (!this.checkOperation('create_node', null!, parentId, position ?? 0)) return false;
 
+    if (data.id && this.store.has(data.id)) {
+      this.reportError({ error: 'duplicate_id', operation: 'create_node', id: data.id, parent: parentId });
+      return false;
+    }
+
     const node: TreeNode = {
-      id: data.id || `new_${Date.now()}`,
+      id: data.id || this.mintId('new'),
       text: data.text,
       icon: data.icon ?? false,
       type: data.type ?? 'default',
@@ -678,11 +745,9 @@ export class MDFolderTree implements TreePluginHost {
 
     this.store.set(node.id, node);
 
-    if (parent) {
-      const pos = position != null ? Math.min(position, parent.children.length) : parent.children.length;
-      parent.children.splice(pos, 0, node.id);
-      parent.children_d.push(node.id);
-    }
+    const pos = position != null ? Math.min(position, parent.children.length) : parent.children.length;
+    parent.children.splice(pos, 0, node.id);
+    parent.children_d.push(node.id);
 
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
     this.emit(`create_node.${EVENT_NS}`, { node, parent: parentId, position });
@@ -690,20 +755,14 @@ export class MDFolderTree implements TreePluginHost {
   }
 
   reorderChildren(parentId: string, childIds: string[]): void {
-    if (parentId === '#') {
-      // Reorder root nodes - we store them by order in the store traversal
-      // Root ordering is implicit from insertion order; for sort we just re-render
-      this.renderer.render(this.getRootNodes(), this.getNodeMap());
-      return;
-    }
-    const parent = this.store.get(parentId);
+    const parent = this.resolveParent(parentId);
     if (!parent) return;
     parent.children = childIds;
     this.renderer.render(this.getRootNodes(), this.getNodeMap());
   }
 
   getRootNodeIds(): string[] {
-    return this.store.getAll().filter((n) => n.parent === '#').map((n) => n.id);
+    return [...this.rootNode.children];
   }
 
   // ---- Core Utility Methods (Phase 1) ----
@@ -939,7 +998,7 @@ export class MDFolderTree implements TreePluginHost {
     this.store.set(newId, node);
 
     // Update parent's children arrays
-    const parent = this.store.get(node.parent);
+    const parent = this.resolveParent(node.parent);
     if (parent) {
       const idx = parent.children.indexOf(id);
       if (idx !== -1) parent.children[idx] = newId;
@@ -1472,6 +1531,8 @@ export class MDFolderTree implements TreePluginHost {
 
     // Clear
     this.store.clear();
+    this.rootNode.children = [];
+    this.rootNode.children_d = [];
     this.selection.deselectAll();
 
     // Reload
@@ -1787,8 +1848,7 @@ export class MDFolderTree implements TreePluginHost {
 
     if (typeof coreData === 'function') {
       // Pattern A: data callback
-      const rootNode = this.createRootNode();
-      (coreData as DataCallback)(rootNode, (data: TreeNodeData[]) => {
+      (coreData as DataCallback)(this.rootNode, (data: TreeNodeData[]) => {
         const parsed = this.jsonParser.parse(data);
         this.buildNodeTree(parsed, '#');
         this.renderer.render(this.getRootNodes(), this.getNodeMap());
@@ -1826,7 +1886,12 @@ export class MDFolderTree implements TreePluginHost {
     if (hasParentRefs) {
       // Two-pass approach for flat arrays with parent references
       // Pass 1: Create all nodes in the store
+      const accepted: TreeNodeData[] = [];
       for (const raw of data) {
+        if (this.store.has(raw.id)) {
+          this.reportError({ error: 'duplicate_id', operation: 'load', id: raw.id });
+          continue;
+        }
         const nodeParent = (raw.parent as string) ?? parentId;
         const node: TreeNode = {
           id: raw.id,
@@ -1851,6 +1916,7 @@ export class MDFolderTree implements TreePluginHost {
         };
 
         this.store.set(node.id, node);
+        accepted.push(raw);
 
         if (node.state.selected) {
           this.selection.select(node.id);
@@ -1858,16 +1924,14 @@ export class MDFolderTree implements TreePluginHost {
       }
 
       // Pass 2: Wire up parent-child relationships
-      for (const raw of data) {
+      for (const raw of accepted) {
         const node = this.store.get(raw.id)!;
         const nodeParent = (raw.parent as string) ?? parentId;
 
-        if (nodeParent !== '#') {
-          const parent = this.store.get(nodeParent);
-          if (parent) {
-            parent.children.push(node.id);
-            parent.children_d.push(node.id);
-          }
+        const parent = this.resolveParent(nodeParent);
+        if (parent) {
+          parent.children.push(node.id);
+          parent.children_d.push(node.id);
         }
 
         node.parents = this.buildParentChain(nodeParent);
@@ -1879,6 +1943,10 @@ export class MDFolderTree implements TreePluginHost {
     } else {
       // Original behavior: all items are children of parentId
       for (const raw of data) {
+        if (this.store.has(raw.id)) {
+          this.reportError({ error: 'duplicate_id', operation: 'load', id: raw.id, parent: parentId });
+          continue;
+        }
         const node: TreeNode = {
           id: raw.id,
           text: raw.text,
@@ -1907,12 +1975,10 @@ export class MDFolderTree implements TreePluginHost {
           this.selection.select(node.id);
         }
 
-        if (parentId !== '#') {
-          const parent = this.store.get(parentId);
-          if (parent) {
-            parent.children.push(node.id);
-            parent.children_d.push(node.id);
-          }
+        const parent = this.resolveParent(parentId);
+        if (parent) {
+          parent.children.push(node.id);
+          parent.children_d.push(node.id);
         }
 
         node.parents = this.buildParentChain(parentId);
@@ -1926,8 +1992,13 @@ export class MDFolderTree implements TreePluginHost {
 
   private buildParentChain(parentId: string): string[] {
     const chain: string[] = [];
+    const seen = new Set<string>();
     let current = parentId;
     while (current !== '#') {
+      // Cyclic parent references (possible with malformed flat data) would
+      // otherwise loop until the array exceeds its maximum length.
+      if (seen.has(current)) break;
+      seen.add(current);
       chain.push(current);
       const parentNode = this.store.get(current);
       current = parentNode?.parent ?? '#';
@@ -1936,8 +2007,50 @@ export class MDFolderTree implements TreePluginHost {
     return chain;
   }
 
+  /**
+   * Resolve a parent id to its node, mapping the `'#'` sentinel to the
+   * ordered root container. Returns null when the parent does not exist.
+   */
+  private resolveParent(parentId: string): TreeNode | null {
+    return parentId === '#' ? this.rootNode : this.store.get(parentId);
+  }
+
+  /**
+   * Mint an id that is guaranteed not to collide with an existing node.
+   * A monotonic counter is used rather than a timestamp, which repeats for
+   * calls made within the same millisecond.
+   */
+  private mintId(prefix: string): string {
+    let candidate: string;
+    do {
+      candidate = `${prefix}_${++this.idCounter}`;
+    } while (this.store.has(candidate));
+    return candidate;
+  }
+
+  /**
+   * True when re-parenting `id` under `parentId` would make the node an
+   * ancestor of itself.
+   */
+  private wouldCreateCycle(id: string, parentId: string): boolean {
+    if (id === parentId) return true;
+
+    const seen = new Set<string>();
+    let current = parentId;
+    while (current !== '#') {
+      if (current === id) return true;
+      // A pre-existing cycle is not caused by this move; stop rather than loop.
+      if (seen.has(current)) break;
+      seen.add(current);
+      current = this.store.get(current)?.parent ?? '#';
+    }
+    return false;
+  }
+
   private getRootNodes(): TreeNode[] {
-    return this.store.getAll().filter((n) => n.parent === '#');
+    return this.rootNode.children
+      .map((id) => this.store.get(id))
+      .filter((n): n is TreeNode => n !== null);
   }
 
   private getNodeMap(): Map<string, TreeNode> {
@@ -2075,21 +2188,32 @@ export class MDFolderTree implements TreePluginHost {
     this.emit(`changed.${EVENT_NS}`, detail);
   }
 
+  /** Record an error and surface it through the `core.error` callback. */
+  private reportError(error: Record<string, unknown>): void {
+    this.lastError = error;
+    if (this.config.core?.error) this.config.core.error(error);
+  }
+
   private checkOperation(operation: string, node: TreeNode | null, parentId: string, position: number): boolean {
     const cb = this.config.core?.check_callback;
     if (cb === true) return true;
+
+    const reject = (): void => this.reportError({
+      error: 'check_callback',
+      operation,
+      id: node?.id,
+      parent: parentId,
+      position,
+    });
+
     if (cb === false) {
-      this.lastError = { error: 'check_callback', operation, id: node?.id, parent: parentId, position };
-      if (this.config.core?.error) this.config.core.error(this.lastError);
+      reject();
       return false;
     }
     if (typeof cb === 'function') {
-      const parent = this.store.get(parentId) ?? this.createRootNode();
+      const parent = this.resolveParent(parentId) ?? this.createRootNode();
       const result = cb(operation, node!, parent, position, {});
-      if (!result) {
-        this.lastError = { error: 'check_callback', operation, id: node?.id, parent: parentId, position };
-        if (this.config.core?.error) this.config.core.error(this.lastError);
-      }
+      if (!result) reject();
       return result;
     }
     return true;

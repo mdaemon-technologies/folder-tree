@@ -15,7 +15,7 @@ This library is a TypeScript port of [jstree](https://www.jstree.com/), created 
 - **Zero runtime dependencies** — pure TypeScript compiled to ES2020, no jQuery required
 - **jstree API compatible** — same method names, events, and CSS classes
 - **`mdTree()` migration helper** — drop-in replacement for `$.jstree()` calls without jQuery
-- **XSS safe** — all DOM rendering via `createElement` + `textContent`, never `innerHTML`
+- **XSS safe by default** — node text is rendered with `createElement` + `textContent`, and `on*` handler attributes supplied via `li_attr`/`a_attr` are stripped. Set `core.sanitize_attrs: false` to opt out and restore jstree-identical attribute passthrough.
 - **Twelve built-in plugins** — `types`, `checkbox`, `search`, `changed`, `conditional_select`, `contextmenu`, `dnd`, `massload`, `sort`, `state`, `unique`, `wholerow`
 - **Multiple output formats** — ESM, CJS, and UMD bundles
 - **Full TypeScript types** included
