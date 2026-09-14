@@ -1,4 +1,5 @@
 import type { TreeNode, TreePlugin } from './types';
+import type { TreeNodeStore } from './TreeNode';
 
 /**
  * DOM rendering engine. Produces md-tree-compatible class names so existing
@@ -9,6 +10,8 @@ import type { TreeNode, TreePlugin } from './types';
  */
 export class TreeRenderer {
   private container: HTMLElement;
+  /** Node lookup for a child list, which the store already keys by id. */
+  private store: TreeNodeStore;
   private plugins: TreePlugin[] = [];
   private sanitizeAttrs: boolean;
   private computePositions: boolean;
@@ -17,12 +20,14 @@ export class TreeRenderer {
 
   constructor(
     container: HTMLElement,
+    store: TreeNodeStore,
     plugins: TreePlugin[] = [],
     sanitizeAttrs = true,
     onError?: (error: Record<string, unknown>) => void,
     computePositions = false,
   ) {
     this.container = container;
+    this.store = store;
     this.plugins = plugins;
     this.sanitizeAttrs = sanitizeAttrs;
     this.onError = onError;
@@ -51,8 +56,57 @@ export class TreeRenderer {
     return /^on/i.test(key);
   }
 
+  /**
+   * Marks put on a node from outside the renderer, which nothing re-applies:
+   * the cut marking on the node, and the focus ring and hover on its anchor.
+   *
+   * Each is tracked by node id -- the keyboard's focused id, the clipboard's
+   * buffered nodes, the hovered anchor found by query -- so a mark restored
+   * onto a new element still belongs to whoever set it.
+   * `md-tree-context` is deliberately absent: the context menu holds the
+   * anchor it marked and clears the mark through that reference, while its
+   * items redraw the node before the menu closes, so a restored copy would
+   * outlive the menu's ability to take it off. Search is absent too, the
+   * plugin putting it back through `onNodeRender`, and the dnd marker sits on
+   * the body rather than inside a node.
+   */
+  private static readonly NODE_MARKS = ['md-tree-cut'];
+  private static readonly ANCHOR_MARKS = ['md-tree-focused', 'md-tree-hovered'];
+
+  /**
+   * The marks every node of a subtree carries, by id. A cascade redraws the
+   * topmost ancestor, so a descendant's marks matter as much as the root's.
+   */
+  private captureMarks(root: Element): Map<string, string[]> {
+    const marks = new Map<string, string[]>();
+    for (const el of [root, ...Array.from(root.querySelectorAll('.md-tree-node'))]) {
+      if (!el.id) continue;
+      const anchor = el.querySelector(':scope > .md-tree-anchor');
+      const held = [
+        ...TreeRenderer.NODE_MARKS.filter((cls) => el.classList.contains(cls)),
+        ...TreeRenderer.ANCHOR_MARKS.filter((cls) => anchor?.classList.contains(cls)),
+      ];
+      if (held.length) marks.set(el.id, held);
+    }
+    return marks;
+  }
+
+  /** Put those marks back on the subtree that replaces it. */
+  private restoreMarks(root: Element, marks: Map<string, string[]>): void {
+    if (marks.size === 0) return;
+    for (const el of [root, ...Array.from(root.querySelectorAll('.md-tree-node'))]) {
+      const held = marks.get(el.id);
+      if (!held) continue;
+      const anchor = el.querySelector(':scope > .md-tree-anchor');
+      for (const cls of held) {
+        if (TreeRenderer.NODE_MARKS.includes(cls)) el.classList.add(cls);
+        else anchor?.classList.add(cls);
+      }
+    }
+  }
+
   /** Render the full tree from the root nodes. */
-  render(nodes: TreeNode[], nodeMap: Map<string, TreeNode>): void {
+  render(nodes: TreeNode[]): void {
     // Apply plugin pre-render hooks
     let processedNodes = nodes;
     for (const plugin of this.plugins) {
@@ -76,14 +130,14 @@ export class TreeRenderer {
 
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < processedNodes.length; i++) {
-      fragment.appendChild(this.renderNode(processedNodes[i], nodeMap, i, processedNodes.length));
+      fragment.appendChild(this.renderNode(processedNodes[i], i, processedNodes.length));
     }
     rootUl.appendChild(fragment);
     this.container.appendChild(rootUl);
   }
 
   /** Re-render a single node and its children in-place. */
-  renderSingleNode(node: TreeNode, nodeMap: Map<string, TreeNode>): void {
+  renderSingleNode(node: TreeNode): void {
     const existing = this.container.querySelector(`#${CSS.escape(node.id)}`);
     if (!existing) return;
 
@@ -93,7 +147,11 @@ export class TreeRenderer {
     // The node's place among its siblings, which aria-posinset reports.
     const siblings = Array.from(parent.children).filter((el) => el.classList.contains('md-tree-node'));
     const index = siblings.indexOf(existing);
-    const newEl = this.renderNode(node, nodeMap, index === -1 ? 0 : index, siblings.length);
+    // Drawing replaces the whole subtree, so the marks it does not own are
+    // taken off the old one and put back on the new.
+    const marks = this.captureMarks(existing);
+    const newEl = this.renderNode(node, index === -1 ? 0 : index, siblings.length);
+    this.restoreMarks(newEl, marks);
     parent.replaceChild(newEl, existing);
   }
 
@@ -106,7 +164,7 @@ export class TreeRenderer {
    * Render one node. `index` and `total` are its place among its siblings,
    * which `aria-posinset` / `aria-setsize` report and `md-tree-last` uses.
    */
-  private renderNode(node: TreeNode, nodeMap: Map<string, TreeNode>, index: number, total: number): HTMLElement {
+  private renderNode(node: TreeNode, index: number, total: number): HTMLElement {
     const isLast = index === total - 1;
     const li = document.createElement('li');
     li.id = node.id;
@@ -228,9 +286,9 @@ export class TreeRenderer {
       childUl.setAttribute('role', 'group');
 
       for (let i = 0; i < node.children.length; i++) {
-        const childNode = nodeMap.get(node.children[i]);
+        const childNode = this.store.get(node.children[i]);
         if (childNode) {
-          childUl.appendChild(this.renderNode(childNode, nodeMap, i, node.children.length));
+          childUl.appendChild(this.renderNode(childNode, i, node.children.length));
         }
       }
       li.appendChild(childUl);

@@ -1,7 +1,6 @@
 import type { MDFolderTree } from '../MDFolderTree';
 import type { TreePlugin, TreePluginHost, TreeNode, NodeRef, ContextMenuConfig, ContextMenuItem } from '../types';
-
-const EVENT_NS = 'MDFolderTree';
+import { EVENT_NS } from '../events/namespace';
 
 /** The data an item's `action`, `_disabled` and `label` receive, as jstree's. */
 interface ItemData {

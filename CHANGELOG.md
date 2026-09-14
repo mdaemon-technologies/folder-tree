@@ -23,6 +23,11 @@ this release is covered by regression tests written against the previous behavio
 
 ### Fixed
 
+- `destroy()` leaves no theme classes behind. It removed the literal
+  `md-tree-default`, so a tree themed anything else — `themes: { name: 'custom' }`,
+  or any later `set_theme` — left `md-tree-custom` on the container, along with
+  `md-tree-custom-responsive` and any variant class, for whatever took the
+  element over next. A theme now takes off exactly the classes it put on.
 - Cyclic parent references no longer hang the page. Building a node's ancestor
   chain looped until the array exceeded its maximum length, freezing the tab and
   then throwing `RangeError: Invalid array length`. Reachable from input data
@@ -138,9 +143,11 @@ this release is covered by regression tests written against the previous behavio
 - `close_opened_onclear` is now implemented; it was previously accepted and
   ignored.
 - `TreePluginHost` gains `selectAll`, `deselectAll` and `setChildOrder`.
-- `TreeRenderer` and `JsonParser` take an optional additional constructor
-  argument (an error reporter and an id generator respectively). Both are
-  optional, so existing direct construction is unaffected.
+- `TreeRenderer` and `JsonParser` take an additional constructor argument (an
+  error reporter and an id generator respectively). `JsonParser`'s is
+  optional, so constructing it directly is unaffected; `TreeRenderer`'s
+  constructor has since gained a required argument, under *Changed —
+  rendering*.
 
 ### Changed — jstree parity: selection, activation and keyboard
 
@@ -607,6 +614,53 @@ migration codemod produces (`jstree-*` → `md-tree-*`, `data-jstree` →
   and out of submenus, Enter / Space, Escape, and items' shortcut keys.
   `context_show` / `context_hide` fire on the document with `{ reference,
   element, position }`.
+
+### Changed — rendering
+
+- **Breaking:** `TreeRenderer` takes the node store as its second constructor
+  argument, and `render` / `renderSingleNode` no longer take a node map. The
+  renderer reads the store directly, so `MDFolderTree.getNodeMap()` — which
+  rebuilt a `Map` of every node in the tree on each of its 26 call sites — is
+  gone. This reaches only code that constructs a `TreeRenderer` itself; no
+  behavior of a tree changes.
+- Redrawing a node keeps the marks the renderer does not own — the focus
+  ring, the cut marking and the hover — across the whole subtree it replaces.
+  They went with the element being swapped out, so checking the focused node
+  lost its focus ring, and a cut node lost its marking on any redraw at all.
+  Search highlighting was never affected (the search plugin re-applies it as
+  each node draws), and the drag marker sits on the body rather than inside a
+  node.
+
+### Changed — the core split up
+
+- `MDFolderTree` was one 3,681-line class. The clipboard, inline editing,
+  keyboard navigation and theming now live in `TreeClipboard`,
+  `TreeInlineEditor`, `TreeKeyboard` and `TreeThemeController`, each exported
+  from the package and each reaching its tree through the public API alone.
+  Every method that moved stayed where it was as a one-line delegation, so
+  nothing a consumer calls, listens for or receives has changed.
+
+### Changed — plugins register themselves
+
+- **Breaking:** a tree applies its plugins in the order its own `plugins`
+  config lists them, as jstree does — `$.jstree.create` walks that array, each
+  plugin decorating the last. Ours applied a fixed order of its own, so
+  wherever two plugins answer the same hook the consumer's order was ignored:
+  under `plugins: ['unique', 'types']` a create both would refuse was reported
+  as the types refusal rather than the unique one. Every hook is affected —
+  `check`, activation vetoes, rendering and teardown. A tree naming a single
+  plugin, which is nearly every tree, is unaffected.
+- `MDFolderTree.registerPlugin(name, factory)` registers a plugin under the
+  name trees list it by, and `getPlugin(name)` returns the one a tree built
+  under that name, or `null`. The twelve built-ins register themselves through
+  that same call, so a plugin of your own is built on the terms theirs are,
+  rather than needing a branch inside the core.
+- The core now constructs no plugin itself and names no implementation. The
+  built-ins register in [src/plugins/register.ts](src/plugins/register.ts),
+  which both package entries import for its side effect — so the package as it
+  ships is unchanged, while a consumer importing `MDFolderTree` on its own can
+  leave every plugin out of their bundle and register only what they use.
+- A `types` config still enables that plugin without naming it, and it leads.
 
 ### Changed — jstree parity: types rules
 

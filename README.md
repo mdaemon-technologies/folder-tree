@@ -210,7 +210,8 @@ Events are dispatched as `CustomEvent` on the container element:
 
 ### Plugins
 
-Enable plugins via the `plugins` config array:
+Enable plugins via the `plugins` config array. They apply in the order listed,
+which is the order their hooks are consulted:
 
 ```ts
 new MDFolderTree(el, {
@@ -220,6 +221,20 @@ new MDFolderTree(el, {
   search: { show_only_matches: true },
 });
 ```
+
+`tree.getPlugin(name)` returns the plugin that tree built under a name, or
+`null`. Register your own under any name and list it like a built-in:
+
+```ts
+MDFolderTree.registerPlugin('audit', () => new AuditPlugin());
+
+new MDFolderTree(el, { plugins: ['checkbox', 'audit'] });
+```
+
+Importing from `@mdaemon/folder-tree` registers all twelve built-ins, so
+nothing changes for a consumer taking the package as it ships. Importing the
+core module on its own registers none, which lets a bundler drop the plugins
+you never name.
 
 ## CSS Compatibility
 

@@ -2,7 +2,8 @@ import type { EventHandler } from '../types';
 
 /**
  * Lightweight event bus that dispatches CustomEvents on a DOM element.
- * Supports namespaced events (e.g. "changed.md-tree") for md-tree compat.
+ * Supports namespaced events (e.g. "changed.MDFolderTree"), the namespace
+ * being part of the type rather than a filter over it.
  */
 export class TreeEventBus {
   private element: HTMLElement;

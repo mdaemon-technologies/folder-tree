@@ -5,6 +5,8 @@
  * Drop-in replacement for jstree.
  */
 import './styles.css';
+// Side effect: registers the built-in plugins by name.
+import './plugins/register';
 
 export { MDFolderTree } from './MDFolderTree';
 export { mdTree } from './jquery-bridge';
@@ -12,6 +14,10 @@ export { TreeEventBus } from './events/TreeEventBus';
 export { TreeRenderer } from './TreeRenderer';
 export { TreeSelection } from './TreeSelection';
 export { TreeNodeStore } from './TreeNode';
+export { TreeClipboard } from './TreeClipboard';
+export { TreeInlineEditor } from './TreeInlineEditor';
+export { TreeKeyboard } from './TreeKeyboard';
+export { TreeThemeController } from './TreeThemeController';
 export { JsonParser } from './parsers/JsonParser';
 export { HtmlParser } from './parsers/HtmlParser';
 export { TypesPlugin } from './plugins/TypesPlugin';
@@ -26,6 +32,8 @@ export { StatePlugin } from './plugins/StatePlugin';
 export { MassloadPlugin } from './plugins/MassloadPlugin';
 export { ContextMenuPlugin } from './plugins/ContextMenuPlugin';
 export { DndPlugin } from './plugins/DndPlugin';
+export type { ClipboardBuffer } from './TreeClipboard';
+export type { EditCallback } from './TreeInlineEditor';
 export type {
   TreeConfig,
   CoreConfig,

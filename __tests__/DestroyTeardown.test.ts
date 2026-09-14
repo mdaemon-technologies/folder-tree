@@ -166,3 +166,44 @@ describe('destroy() teardown', () => {
     });
   });
 });
+
+/**
+ * A destroyed tree must leave the container as it found it. Teardown removed
+ * the literal 'md-tree-default' class rather than the theme actually in use,
+ * so a tree themed anything else left its classes behind, as did any variant.
+ */
+describe('destroy() theme classes', () => {
+  let container: HTMLElement;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    MDFolderTree.getInstance(container)?.destroy();
+    container.remove();
+  });
+
+  const nodes: TreeNodeData[] = [{ id: 'a', text: 'A' }];
+
+  it('should remove the theme class whatever the theme is named', () => {
+    const tree = new MDFolderTree(container, {
+      core: { data: nodes, themes: { name: 'custom', responsive: true } },
+    });
+
+    tree.destroy();
+
+    expect(container.classList.contains('md-tree-custom')).toBe(false);
+    expect(container.classList.contains('md-tree-custom-responsive')).toBe(false);
+  });
+
+  it('should remove the theme variant class', () => {
+    const tree = new MDFolderTree(container, { core: { data: nodes } });
+    tree.set_theme_variant('large');
+
+    tree.destroy();
+
+    expect(container.classList.contains('md-tree-default-large')).toBe(false);
+  });
+});

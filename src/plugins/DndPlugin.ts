@@ -1,7 +1,6 @@
 import type { MDFolderTree } from '../MDFolderTree';
 import type { TreePlugin, TreePluginHost, TreeNode, DndConfig, CheckMore, NodeRef } from '../types';
-
-const EVENT_NS = 'MDFolderTree';
+import { EVENT_NS } from '../events/namespace';
 
 /** jstree's `$.vakata.dnd.settings`. */
 const THRESHOLD = 5;

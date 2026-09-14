@@ -1,4 +1,7 @@
 import '@testing-library/jest-dom';
+// The built-in plugin names, as the package entries register them for a
+// consumer. Tests reach for `src/MDFolderTree` directly, which registers none.
+import '../src/plugins/register';
 
 // Polyfill CSS.escape for jsdom
 if (typeof CSS === 'undefined') {

@@ -8,7 +8,6 @@ import type {
   DataCallback,
   ChangedDetail,
   ActivationEvent,
-  KeyboardHandler,
   NodeRef,
   CheckMore,
   TypeConfig,
@@ -17,53 +16,30 @@ import type {
   LegacyTreeState,
 } from './types';
 import { TreeEventBus } from './events/TreeEventBus';
-import { comboFromEvent, normalizeCombo } from './keyboard';
 import { TreeRenderer } from './TreeRenderer';
 import { TreeSelection } from './TreeSelection';
 import { TreeNodeStore } from './TreeNode';
 import { buildModel, type ModelOutput } from './model';
 import { HtmlParser } from './parsers/HtmlParser';
-import { TypesPlugin } from './plugins/TypesPlugin';
-import { CheckboxPlugin } from './plugins/CheckboxPlugin';
-import { SearchPlugin } from './plugins/SearchPlugin';
-import { ChangedPlugin } from './plugins/ChangedPlugin';
-import { ConditionalSelectPlugin } from './plugins/ConditionalSelectPlugin';
-import { WholerowPlugin } from './plugins/WholerowPlugin';
-import { SortPlugin } from './plugins/SortPlugin';
-import { UniquePlugin } from './plugins/UniquePlugin';
-import { StatePlugin } from './plugins/StatePlugin';
-import { ContextMenuPlugin } from './plugins/ContextMenuPlugin';
-import { DndPlugin } from './plugins/DndPlugin';
-import { MassloadPlugin } from './plugins/MassloadPlugin';
+import { TreeClipboard, type ClipboardBuffer } from './TreeClipboard';
+import { TreeInlineEditor, type EditCallback } from './TreeInlineEditor';
+import { TreeKeyboard } from './TreeKeyboard';
+import { isNodeVisible } from './dom';
+import { EVENT_NS } from './events/namespace';
+import { TreeThemeController } from './TreeThemeController';
+// Type-only: the core constructs no plugin itself. The built-ins register
+// themselves under their names in `./plugins/register`, which the package
+// entries import, so nothing here names a plugin implementation.
+import type { TypesPlugin } from './plugins/TypesPlugin';
+import type { CheckboxPlugin } from './plugins/CheckboxPlugin';
+import type { SearchPlugin } from './plugins/SearchPlugin';
+import type { SortPlugin } from './plugins/SortPlugin';
+import type { UniquePlugin } from './plugins/UniquePlugin';
+import type { MassloadPlugin } from './plugins/MassloadPlugin';
 import { isAjaxConfig, sendAjax } from './ajax';
-
-const EVENT_NS = 'MDFolderTree';
 
 /** The `more` argument jstree passes to check() for a same-tree move or copy. */
 const CORE_MORE: CheckMore = { core: true, is_multi: false, is_foreign: false };
-
-/**
- * jstree's clipboard (its `ccp_node`, `ccp_mode` and `ccp_inst`): one buffer
- * for every tree on the page, so what is cut or copied in one tree pastes
- * into another.
- */
-let clipboard: { mode: 'move_node' | 'copy_node'; nodes: TreeNode[]; inst: MDFolderTree } | null = null;
-
-/** jstree's `themes_loaded`: theme stylesheets already on the page. */
-const themesLoaded = new Set<string>();
-
-/**
- * The directory this script was loaded from, which `themes.url: true` builds
- * on when `themes.dir` is unset — jstree uses its own script path the same
- * way. Null outside a browser, or when the script cannot be identified (a
- * module, rather than a `<script>` tag), in which case a theme is only
- * autoloaded when `themes.dir` says where to look.
- */
-const scriptDir = ((): string | null => {
-  if (typeof document === 'undefined') return null;
-  const src = (document.currentScript as HTMLScriptElement | null)?.src;
-  return src ? src.replace(/\/[^/]*$/, '') : null;
-})();
 
 export class MDFolderTree implements TreePluginHost {
   readonly config: TreeConfig;
@@ -73,8 +49,23 @@ export class MDFolderTree implements TreePluginHost {
   private selection: TreeSelection;
   private store: TreeNodeStore;
   private plugins: TreePlugin[] = [];
-  private checkboxPlugin: CheckboxPlugin | null = null;
-  private searchPlugin: SearchPlugin | null = null;
+  /**
+   * The same plugins, under the names this tree built them by. A plugin's own
+   * `name` is what it reports itself as -- in a refusal, say -- which is not
+   * necessarily the name it was registered and listed under.
+   */
+  private pluginsByName = new Map<string, TreePlugin>();
+  /** Cut / copy / paste, over a buffer the whole page shares. */
+  private clipboard = new TreeClipboard(this);
+  /** Renaming a node in place. */
+  private inlineEditor = new TreeInlineEditor(this);
+  /** Keyboard navigation, and the virtual focus it moves. */
+  private keyboard = new TreeKeyboard(this);
+  /**
+   * The theme, its variant and the display flags. The renderer keeps its own
+   * copy of the theme name, so it is handed a setter rather than exposed.
+   */
+  private theme = new TreeThemeController(this, (name) => this.renderer.setThemeName(name));
   private htmlParser: HtmlParser;
   private destroyed = false;
   private idCounter = 0;
@@ -133,6 +124,7 @@ export class MDFolderTree implements TreePluginHost {
     this.initPlugins();
     this.renderer = new TreeRenderer(
       element,
+      this.store,
       this.plugins,
       this.config.core?.sanitize_attrs ?? true,
       (error) => this.reportError(error),
@@ -140,7 +132,7 @@ export class MDFolderTree implements TreePluginHost {
     );
 
     // Apply theme classes
-    this.applyThemeClasses();
+    this.theme.applyClasses();
     this.applyContainerFlags();
 
     // jstree's `init`: bound and themed, not yet loading.
@@ -155,7 +147,7 @@ export class MDFolderTree implements TreePluginHost {
     this.bindEvents();
 
     // Keyboard navigation
-    this.bindKeyboard();
+    this.keyboard.bind(this.listeners.signal, () => this.destroyed);
   }
 
   // ---- Public API (md-tree-compatible, no jQuery required) ----
@@ -202,7 +194,7 @@ export class MDFolderTree implements TreePluginHost {
     this.syncSelectionFlags();
 
     if (!preventOpen) this.openAncestors(node);
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
 
     this.emit(`select_node.${EVENT_NS}`, { node, selected: this.selection.getSelected(), event });
     if (!suppress) this.emitChanged('select_node', node, event);
@@ -228,7 +220,7 @@ export class MDFolderTree implements TreePluginHost {
 
     this.selection.deselect(id);
     this.syncSelectionFlags();
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
 
     this.emit(`deselect_node.${EVENT_NS}`, { node, selected: this.selection.getSelected(), event });
     if (!suppress) this.emitChanged('deselect_node', node, event);
@@ -239,7 +231,7 @@ export class MDFolderTree implements TreePluginHost {
     // Every node, disabled included, as jstree selects `root.children_d`.
     this.selection.selectAll(this.store.getAllIds());
     this.syncSelectionFlags();
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
 
     this.emit(`select_all.${EVENT_NS}`, { selected: this.selection.getSelected() });
     if (!suppress) this.emitChanged('select_all', null, undefined, oldSelection);
@@ -249,7 +241,7 @@ export class MDFolderTree implements TreePluginHost {
     const oldSelection = this.selection.getSelected();
     this.selection.deselectAll();
     this.syncSelectionFlags();
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
 
     this.emit(`deselect_all.${EVENT_NS}`, { selected: [], node: oldSelection });
     if (!suppress) this.emitChanged('deselect_all', null, undefined, oldSelection);
@@ -277,7 +269,8 @@ export class MDFolderTree implements TreePluginHost {
     // jstree's checkbox plugin overrides activate_node: while checking is tied
     // to selection a checkbox click behaves as a ctrl-click (toggle); when it
     // is not, the checkbox toggles independently of selection.
-    if (this.checkboxPlugin) {
+    const checkbox = this.checkboxPlugin;
+    if (checkbox) {
       // jstree ignores a click on a disabled checkbox.
       if (this.isCheckboxTarget(event) && node.state.checkbox_disabled) return false;
       const tie = this.config.checkbox?.tie_selection !== false;
@@ -286,8 +279,8 @@ export class MDFolderTree implements TreePluginHost {
       if (tie && (wholeNode || onCheckbox)) ctrl = true;
       if (!tie && (wholeNode || onCheckbox)) {
         if (node.state.disabled) return false;
-        if (node.state.checked) this.checkboxPlugin.uncheck_node(id, event);
-        else this.checkboxPlugin.check_node(id, event);
+        if (node.state.checked) checkbox.uncheck_node(id, event);
+        else checkbox.check_node(id, event);
         this.emit(`activate_node.${EVENT_NS}`, { node });
         return true;
       }
@@ -446,7 +439,7 @@ export class MDFolderTree implements TreePluginHost {
     const node = this.store.get(id);
     if (!node) return;
     node.state.disabled = false;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     this.emit(`enable_node.${EVENT_NS}`, { node });
   }
 
@@ -460,7 +453,7 @@ export class MDFolderTree implements TreePluginHost {
     const node = this.store.get(id);
     if (!node) return;
     node.state.disabled = true;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     this.emit(`disable_node.${EVENT_NS}`, { node });
   }
 
@@ -488,7 +481,7 @@ export class MDFolderTree implements TreePluginHost {
   redrawNode(id: string): void {
     const node = this.store.get(id);
     if (!node) return;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
   }
 
   /**
@@ -796,7 +789,7 @@ export class MDFolderTree implements TreePluginHost {
    */
   private newNodeName(par: TreeNode): string {
     const base = this.get_string('New node');
-    const unique = this.plugins.find((p) => p.name === 'unique') as UniquePlugin | undefined;
+    const unique = this.getPlugin<UniquePlugin>('unique');
     return unique ? unique.newNodeName(par, base) : base;
   }
 
@@ -859,60 +852,25 @@ export class MDFolderTree implements TreePluginHost {
 
   // ---- Theme Runtime API ----
 
-  private themeName = 'default';
-  private themeVariant: string | false = false;
-
   /**
    * jstree's `set_theme(name, url)`: swap the theme's classes and, given a
    * URL — or `true`, meaning `<themes.dir>/<name>/style.css` — inject that
    * stylesheet, each one only once per page.
    */
   set_theme(name: string, url?: string | boolean): void {
-    if (!name) return;
-    this.loadThemeStylesheet(name, url);
-    const old = this.themeName;
-    this.element.classList.remove(`md-tree-${old}`, `md-tree-${old}-responsive`);
-    this.themeName = name;
-    this.renderer.setThemeName(name);
-    this.element.classList.add(`md-tree-${name}`);
-    // As in jstree, `themes.responsive` marks the theme as responsive.
-    this.element.classList.toggle(`md-tree-${name}-responsive`, this.config.core?.themes?.responsive === true);
-    this.emit(`set_theme.${EVENT_NS}`, { theme: name });
-  }
-
-  /** The stylesheet behind `themes.url`, injected once. */
-  private loadThemeStylesheet(name: string, url?: string | boolean): void {
-    let href = typeof url === 'string' ? url : null;
-    if (url === true) {
-      const dir = this.config.core?.themes?.dir || (scriptDir ? `${scriptDir}/themes` : null);
-      // Without a directory there is nowhere to load from, so load nothing.
-      href = dir ? `${dir}/${name}/style.css` : null;
-    }
-    if (!href || themesLoaded.has(href) || typeof document === 'undefined') return;
-    themesLoaded.add(href);
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.type = 'text/css';
-    link.href = href;
-    document.head.appendChild(link);
+    this.theme.setTheme(name, url);
   }
 
   get_theme(): string {
-    return this.themeName;
+    return this.theme.getTheme();
   }
 
   set_theme_variant(variant: string | false): void {
-    if (this.themeVariant) {
-      this.element.classList.remove(`md-tree-${this.themeName}-${this.themeVariant}`);
-    }
-    this.themeVariant = variant;
-    if (variant) {
-      this.element.classList.add(`md-tree-${this.themeName}-${variant}`);
-    }
+    this.theme.setThemeVariant(variant);
   }
 
   get_theme_variant(): string | false {
-    return this.themeVariant;
+    return this.theme.getThemeVariant();
   }
 
   // ---- jstree methods: hover, container, strings, types, redraw ----
@@ -1003,7 +961,7 @@ export class MDFolderTree implements TreePluginHost {
   get_rules(obj: NodeRef): Record<string, unknown> | false {
     const node = this.resolveNode(obj);
     if (!node) return false;
-    const plugin = this.plugins.find((p) => p.name === 'types') as TypesPlugin | undefined;
+    const plugin = this.getPlugin<TypesPlugin>('types');
     // jstree's defaults, which the plugin already folds in for a live tree.
     const rules = plugin
       ? plugin.rulesWithDefaults(node.type)
@@ -1017,7 +975,7 @@ export class MDFolderTree implements TreePluginHost {
    */
   sort(obj: NodeRef, deep = false): void {
     const id = this.resolveId(obj);
-    const plugin = this.plugins.find((p) => p.name === 'sort') as SortPlugin | undefined;
+    const plugin = this.getPlugin<SortPlugin>('sort');
     if (id !== null && plugin) plugin.sortNode(id, deep);
   }
 
@@ -1026,7 +984,7 @@ export class MDFolderTree implements TreePluginHost {
    * fills unset properties from 'default'), otherwise from `config.types`.
    */
   private typeRules(type: string): TypeConfig | undefined {
-    const plugin = this.plugins.find((p) => p.name === 'types') as TypesPlugin | undefined;
+    const plugin = this.getPlugin<TypesPlugin>('types');
     return plugin ? plugin.rules(type) : this.config.types?.[type];
   }
 
@@ -1034,7 +992,7 @@ export class MDFolderTree implements TreePluginHost {
   redraw_node(obj: NodeRef): HTMLElement | false {
     const node = this.resolveNode(obj);
     if (!node || node.id === '#') return false;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     return (this.element.querySelector(`#${CSS.escape(node.id)}`) as HTMLElement | null) ?? false;
   }
 
@@ -1058,8 +1016,9 @@ export class MDFolderTree implements TreePluginHost {
       if (node.state.selected) core.selected.push(node.id);
     }
     const state: TreeState = { core };
-    if (this.checkboxPlugin && this.config.checkbox?.tie_selection === false) {
-      state.checkbox = this.checkboxPlugin.get_checked();
+    const checkbox = this.checkboxPlugin;
+    if (checkbox && this.config.checkbox?.tie_selection === false) {
+      state.checkbox = checkbox.get_checked();
     }
     return state;
   }
@@ -1135,7 +1094,7 @@ export class MDFolderTree implements TreePluginHost {
         return this.applyState(state, callback);
       }
       for (const key of Object.keys(state)) {
-        if (key !== 'core' && !this.plugins.some((p) => p.name === key)) delete state[key];
+        if (key !== 'core' && !this.getPlugin(key)) delete state[key];
       }
       // Anything else in core has no step; it would otherwise stall the state.
       delete state.core;
@@ -1144,10 +1103,11 @@ export class MDFolderTree implements TreePluginHost {
 
     // The checkbox plugin's step, while checking is not tied to selection.
     if (state.checkbox !== undefined) {
-      if (this.checkboxPlugin && this.config.checkbox?.tie_selection === false) {
-        this.checkboxPlugin.uncheck_all();
+      const checkbox = this.checkboxPlugin;
+      if (checkbox && this.config.checkbox?.tie_selection === false) {
+        checkbox.uncheck_all();
         if (Array.isArray(state.checkbox)) {
-          for (const id of state.checkbox) this.checkboxPlugin.check_node(String(id));
+          for (const id of state.checkbox) checkbox.check_node(String(id));
         }
       }
       delete state.checkbox;
@@ -1155,7 +1115,7 @@ export class MDFolderTree implements TreePluginHost {
     }
 
     for (const key of Object.keys(state)) {
-      if (!this.plugins.some((p) => p.name === key)) delete state[key];
+      if (!this.getPlugin(key)) delete state[key];
     }
     if (Object.keys(state).length === 0) {
       callback?.();
@@ -1209,9 +1169,8 @@ export class MDFolderTree implements TreePluginHost {
     // Detach every listener bound directly to the container.
     this.listeners.abort();
 
-    this.setFocused(null);
-    // A destroyed tree's nodes can no longer be pasted.
-    if (clipboard?.inst === this) clipboard = null;
+    this.keyboard.setFocused(null);
+    this.clipboard.forget();
 
     this.eventBus.destroy();
     this.store.clear();
@@ -1219,11 +1178,11 @@ export class MDFolderTree implements TreePluginHost {
     this.rootNode.children_d = [];
     this.element.removeAttribute('aria-multiselectable');
     this.element.removeAttribute('aria-busy');
+    this.theme.teardown();
     this.element.classList.remove(
       'md-tree',
       'md-tree-rtl',
       'md-tree-loading',
-      'md-tree-default',
       'md-tree-checkbox-no-clicked',
       'md-tree-checkbox-selection',
       'md-tree-no-checkboxes',
@@ -1293,7 +1252,7 @@ export class MDFolderTree implements TreePluginHost {
       this.emit(`before_open.${EVENT_NS}`, { node });
     }
     node.state.opened = true;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     if (!suppress) this.emit(`open_node.${EVENT_NS}`, { node });
     this.slide(node.id, 'down', this.animationFor(animation), () => {
       if (!suppress) this.emit(`after_open.${EVENT_NS}`, { node });
@@ -1305,7 +1264,7 @@ export class MDFolderTree implements TreePluginHost {
     const node = this.store.get(id);
     if (!node) return;
     node.state.opened = false;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     if (!suppress) this.emit(`close_node.${EVENT_NS}`, { node });
     this.slide(node.id, 'up', this.animationFor(animation), () => {
       if (!suppress) this.emit(`after_close.${EVENT_NS}`, { node });
@@ -1355,7 +1314,7 @@ export class MDFolderTree implements TreePluginHost {
   }
 
   redraw(): void {
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
     // As in jstree, the event carries the nodes that were drawn.
     this.emit(`redraw.${EVENT_NS}`, { nodes: Array.from(this.element.querySelectorAll('.md-tree-node')) });
   }
@@ -1396,7 +1355,7 @@ export class MDFolderTree implements TreePluginHost {
     node.parent = parentId;
     this.reindex();
 
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
     this.emit(`move_node.${EVENT_NS}`, {
       node,
       parent: parentId,
@@ -1434,7 +1393,7 @@ export class MDFolderTree implements TreePluginHost {
     this.reindex();
     this.emitModel([newId, ...copy.children_d], parentId);
 
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
     this.emit(`copy_node.${EVENT_NS}`, {
       node: copy,
       original,
@@ -1507,7 +1466,7 @@ export class MDFolderTree implements TreePluginHost {
 
     const oldText = node.text;
     node.text = text;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     this.emit(`rename_node.${EVENT_NS}`, { node, text, old: oldText });
     return true;
   }
@@ -1542,7 +1501,7 @@ export class MDFolderTree implements TreePluginHost {
     removeRecursive(id);
     this.reindex();
 
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
     this.emit(`delete_node.${EVENT_NS}`, { node, parent: parent?.id ?? '#' });
     if (hadSelected) {
       this.syncSelectionFlags();
@@ -1590,7 +1549,7 @@ export class MDFolderTree implements TreePluginHost {
     this.reindex();
     this.emitModel([node.id, ...node.children_d], parent.id);
 
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
     return node;
   }
 
@@ -1607,7 +1566,7 @@ export class MDFolderTree implements TreePluginHost {
 
   reorderChildren(parentId: string, childIds: string[]): void {
     this.setChildOrder(parentId, childIds);
-    this.renderer.render(this.getRootNodes(), this.getNodeMap());
+    this.renderer.render(this.getRootNodes());
   }
 
   getRootNodeIds(): string[] {
@@ -1660,7 +1619,7 @@ export class MDFolderTree implements TreePluginHost {
     if (!node) return false;
     const old = node.text;
     node.text = text;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     // jstree names the node `obj` here; `node` and `old` are ours, kept.
     this.emit(`set_text.${EVENT_NS}`, { obj: node, node, text, old });
     return true;
@@ -1688,7 +1647,7 @@ export class MDFolderTree implements TreePluginHost {
   ): TreeNodeData | TreeNodeData[] | false {
     const start = this.resolveNode(obj ?? '#');
     if (!start) return false;
-    const withType = this.plugins.some((p) => p.name === 'types');
+    const withType = this.getPlugin('types') !== null;
     const flat: TreeNodeData[] = [];
 
     const serialize = (node: TreeNode): TreeNodeData => {
@@ -1811,7 +1770,7 @@ export class MDFolderTree implements TreePluginHost {
 
     if (strict) {
       let next = el.nextElementSibling;
-      while (next && !(next.classList.contains('md-tree-node') && this.isNodeVisible(next))) {
+      while (next && !(next.classList.contains('md-tree-node') && isNodeVisible(next))) {
         next = next.nextElementSibling;
       }
       return next as HTMLElement | null;
@@ -1819,7 +1778,7 @@ export class MDFolderTree implements TreePluginHost {
 
     const nodes = Array.from(this.element.querySelectorAll('.md-tree-node'));
     for (let i = nodes.indexOf(el) + 1; i < nodes.length; i++) {
-      if (this.isNodeVisible(nodes[i])) return nodes[i] as HTMLElement;
+      if (isNodeVisible(nodes[i])) return nodes[i] as HTMLElement;
     }
     return null;
   }
@@ -1833,7 +1792,7 @@ export class MDFolderTree implements TreePluginHost {
 
     if (strict) {
       let prev = el.previousElementSibling;
-      while (prev && !(prev.classList.contains('md-tree-node') && this.isNodeVisible(prev))) {
+      while (prev && !(prev.classList.contains('md-tree-node') && isNodeVisible(prev))) {
         prev = prev.previousElementSibling;
       }
       return prev as HTMLElement | null;
@@ -1841,7 +1800,7 @@ export class MDFolderTree implements TreePluginHost {
 
     const nodes = Array.from(this.element.querySelectorAll('.md-tree-node'));
     for (let i = nodes.indexOf(el) - 1; i >= 0; i--) {
-      if (this.isNodeVisible(nodes[i])) return nodes[i] as HTMLElement;
+      if (isNodeVisible(nodes[i])) return nodes[i] as HTMLElement;
     }
     return null;
   }
@@ -1998,75 +1957,51 @@ export class MDFolderTree implements TreePluginHost {
   // ---- Theme Runtime Toggles (Phase 3) ----
 
   show_stripes(): void {
-    this.element.classList.add('md-tree-striped');
-    this.emit(`show_stripes.${EVENT_NS}`, {});
+    this.theme.showStripes();
   }
 
   hide_stripes(): void {
-    this.element.classList.remove('md-tree-striped');
-    this.emit(`hide_stripes.${EVENT_NS}`, {});
+    this.theme.hideStripes();
   }
 
   toggle_stripes(): void {
-    if (this.element.classList.contains('md-tree-striped')) {
-      this.hide_stripes();
-    } else {
-      this.show_stripes();
-    }
+    this.theme.toggleStripes();
   }
 
   show_dots(): void {
-    this.element.classList.remove('md-tree-no-dots');
-    this.emit(`show_dots.${EVENT_NS}`, {});
+    this.theme.showDots();
   }
 
   hide_dots(): void {
-    this.element.classList.add('md-tree-no-dots');
-    this.emit(`hide_dots.${EVENT_NS}`, {});
+    this.theme.hideDots();
   }
 
   toggle_dots(): void {
-    if (this.element.classList.contains('md-tree-no-dots')) {
-      this.show_dots();
-    } else {
-      this.hide_dots();
-    }
+    this.theme.toggleDots();
   }
 
   show_icons(): void {
-    this.element.classList.remove('md-tree-no-icons');
-    this.emit(`show_icons.${EVENT_NS}`, {});
+    this.theme.showIcons();
   }
 
   hide_icons(): void {
-    this.element.classList.add('md-tree-no-icons');
-    this.emit(`hide_icons.${EVENT_NS}`, {});
+    this.theme.hideIcons();
   }
 
   toggle_icons(): void {
-    if (this.element.classList.contains('md-tree-no-icons')) {
-      this.show_icons();
-    } else {
-      this.hide_icons();
-    }
+    this.theme.toggleIcons();
   }
 
   show_ellipsis(): void {
-    this.element.classList.add('md-tree-ellipsis');
-    this.emit(`show_ellipsis.${EVENT_NS}`, {});
+    this.theme.showEllipsis();
   }
 
   hide_ellipsis(): void {
-    this.element.classList.remove('md-tree-ellipsis');
-    this.emit(`hide_ellipsis.${EVENT_NS}`, {});
+    this.theme.hideEllipsis();
   }
 
   toggle_ellipsis(): void {
-    if (this.element.classList.contains('md-tree-ellipsis')) {
-      this.hide_ellipsis();
-    } else {
-      this.show_ellipsis();
-    }
+    this.theme.toggleEllipsis();
   }
 
   /**
@@ -2083,7 +2018,7 @@ export class MDFolderTree implements TreePluginHost {
     const node = this.store.get(id);
     if (!node) return false;
     node.icon = icon === true || icon === null || icon === undefined || icon === '' ? true : icon;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     return true;
   }
 
@@ -2125,7 +2060,7 @@ export class MDFolderTree implements TreePluginHost {
     const node = id === null ? null : this.store.get(id);
     if (!node) return false;
     node.icon = this.themeIconOf(node.id)?.getAttribute('rel') || true;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
     return true;
   }
 
@@ -2141,34 +2076,12 @@ export class MDFolderTree implements TreePluginHost {
    * paste to move. False when there is nothing to buffer.
    */
   cut(obj?: NodeRef | NodeRef[]): false | void {
-    return this.fillBuffer('move_node', obj);
+    return this.clipboard.cut(obj);
   }
 
   /** jstree's `copy`: as `cut`, for paste to copy. */
   copy(obj?: NodeRef | NodeRef[]): false | void {
-    return this.fillBuffer('copy_node', obj);
-  }
-
-  private fillBuffer(mode: 'move_node' | 'copy_node', obj?: NodeRef | NodeRef[]): false | void {
-    const refs: NodeRef[] = obj === undefined || obj === null ? this.selection.getSelected() : Array.isArray(obj) ? obj : [obj];
-    const nodes = refs
-      .map((ref) => this.resolveNode(ref))
-      .filter((node): node is TreeNode => node !== null && node.id !== '#');
-    if (!nodes.length) return false;
-    MDFolderTree.markCut(false);
-    clipboard = { mode, nodes, inst: this };
-    MDFolderTree.markCut(true);
-    // jstree's payload is the nodes as given; `ids` is what earlier releases sent.
-    this.emit(`${mode === 'move_node' ? 'cut' : 'copy'}.${EVENT_NS}`, { node: refs, ids: nodes.map((n) => n.id) });
-  }
-
-  /** The buffered nodes' `md-tree-cut` marking, in their own tree, while they wait to be moved. */
-  private static markCut(on: boolean): void {
-    if (clipboard?.mode !== 'move_node') return;
-    const container = clipboard.inst.getContainer();
-    for (const node of clipboard.nodes) {
-      container.querySelector(`#${CSS.escape(node.id)}`)?.classList.toggle('md-tree-cut', on);
-    }
+    return this.clipboard.copy(obj);
   }
 
   /**
@@ -2178,16 +2091,7 @@ export class MDFolderTree implements TreePluginHost {
    * empty the buffer (without `clear_buffer`). Returns whether it pasted.
    */
   paste(obj: NodeRef, pos?: number | string): boolean {
-    const target = this.resolveNode(obj);
-    if (!target || !clipboard) return false;
-    const { mode, nodes, inst } = clipboard;
-    MDFolderTree.markCut(false);
-    const pasted = this[mode](nodes, target, pos, undefined, false, false, inst);
-    if (pasted) {
-      this.emit(`paste.${EVENT_NS}`, { parent: target.id, node: nodes, mode, ids: nodes.map((n) => n.id) });
-    }
-    clipboard = null;
-    return Boolean(pasted);
+    return this.clipboard.paste(obj, pos);
   }
 
   /**
@@ -2195,297 +2099,27 @@ export class MDFolderTree implements TreePluginHost {
    * 'copy_node', the nodes and their tree, all false when empty — with the
    * ids as `ids`, as earlier releases reported them.
    */
-  get_buffer(): {
-    mode: 'move_node' | 'copy_node' | false;
-    node: TreeNode[] | false;
-    inst: MDFolderTree | false;
-    ids: string[];
-  } {
-    if (!clipboard) return { mode: false, node: false, inst: false, ids: [] };
-    return { mode: clipboard.mode, node: [...clipboard.nodes], inst: clipboard.inst, ids: clipboard.nodes.map((n) => n.id) };
+  get_buffer(): ClipboardBuffer {
+    return this.clipboard.getBuffer();
   }
 
   /** jstree's `can_paste`: whether anything is buffered. */
   can_paste(): boolean {
-    return clipboard !== null;
+    return this.clipboard.canPaste();
   }
 
   /** jstree's `clear_buffer`: empty the buffer and emit `clear_buffer`. */
   clear_buffer(): void {
-    MDFolderTree.markCut(false);
-    clipboard = null;
-    this.emit(`clear_buffer.${EVENT_NS}`, {});
-  }
-
-  // ---- Inline Editing (Phase 5) ----
-
-  edit(obj: NodeRef, defaultText?: string, callback?: (node: TreeNode, status: boolean, cancel: boolean) => void): void {
-    const id = this.resolveId(obj);
-    if (id === null) return;
-    const node = this.store.get(id);
-    if (!node) return;
-    if (!this.check('edit', node, node.parent)) return;
-
-    const el = this.element.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null;
-    if (!el) return;
-
-    const anchor = el.querySelector(':scope > .md-tree-anchor') as HTMLElement | null;
-    if (!anchor) return;
-
-    // Find the text span
-    const textSpan = anchor.querySelector('span') as HTMLElement | null;
-    if (!textSpan) return;
-
-    const originalText = node.text;
-    const editText = defaultText ?? originalText;
-
-    // Create input
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'md-tree-rename-input';
-    input.value = editText;
-
-    // Hide text, show input
-    textSpan.style.display = 'none';
-    anchor.appendChild(input);
-    input.focus();
-    input.select();
-
-    this.emit(`edit.${EVENT_NS}`, { node });
-
-    const commit = () => {
-      const newText = input.value.trim();
-      cleanup();
-      if (newText && newText !== originalText) {
-        this.renameNode(id, newText);
-        if (callback) callback(node, true, false);
-      } else {
-        if (callback) callback(node, false, false);
-      }
-    };
-
-    const cancel = () => {
-      cleanup();
-      if (callback) callback(node, false, true);
-    };
-
-    const cleanup = () => {
-      input.removeEventListener('keydown', onKey);
-      input.removeEventListener('blur', onBlur);
-      if (input.parentElement) input.parentElement.removeChild(input);
-      textSpan.style.display = '';
-    };
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        commit();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        cancel();
-      }
-    };
-
-    const onBlur = () => {
-      commit();
-    };
-
-    input.addEventListener('keydown', onKey);
-    input.addEventListener('blur', onBlur);
-  }
-
-  // ---- Keyboard Navigation (Phase 6) ----
-
-  private focusedId: string | null = null;
-
-  private setFocused(id: string | null): void {
-    // Remove old focus
-    if (this.focusedId) {
-      const oldEl = this.element.querySelector(`#${CSS.escape(this.focusedId)} > .md-tree-anchor`);
-      if (oldEl) oldEl.classList.remove('md-tree-focused');
-    }
-
-    this.focusedId = id;
-
-    // Add new focus
-    if (id) {
-      const newEl = this.element.querySelector(`#${CSS.escape(id)} > .md-tree-anchor`) as HTMLElement | null;
-      if (newEl) {
-        newEl.classList.add('md-tree-focused');
-        if (newEl.scrollIntoView) newEl.scrollIntoView({ block: 'nearest' });
-      }
-      this.element.setAttribute('aria-activedescendant', id);
-    } else {
-      this.element.removeAttribute('aria-activedescendant');
-    }
-  }
-
-  private getFirstVisibleNodeId(): string | null {
-    const nodes = Array.from(this.element.querySelectorAll('.md-tree-node'));
-    return nodes.find((el) => this.isNodeVisible(el))?.id ?? null;
-  }
-
-  private getLastVisibleNodeId(): string | null {
-    const nodes = Array.from(this.element.querySelectorAll('.md-tree-node'));
-    for (let i = nodes.length - 1; i >= 0; i--) {
-      if (this.isNodeVisible(nodes[i])) return nodes[i].id;
-    }
-    return null;
+    this.clipboard.clearBuffer();
   }
 
   /**
-   * Whether a rendered node is visible: not hidden itself, with no hidden or
-   * collapsed ancestor. jstree tests rendered height instead, which is not
-   * available here (nor in jsdom); the classes carry the same information.
+   * jstree's `edit`: rename a node in place, starting from `defaultText` when
+   * given one. The callback is told the node, whether it was renamed, and
+   * whether Escape cancelled it.
    */
-  private isNodeVisible(el: Element): boolean {
-    if (el.classList.contains('md-tree-hidden')) return false;
-    return !el.parentElement?.closest('.md-tree-closed, .md-tree-hidden');
-  }
-
-  private bindKeyboard(): void {
-    this.element.setAttribute('tabindex', '0');
-    const defaults = this.defaultKeyboard();
-
-    this.element.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (this.destroyed) return;
-      // As jstree does, leave keystrokes typed into an input (inline rename).
-      if (e.target instanceof HTMLInputElement) return;
-
-      const handler = this.keyboardHandlerFor(e, defaults);
-      // A jQuery handler returning false prevents default and stops
-      // propagation; jstree's keyboard contract relies on that.
-      if (handler && handler.call(this, this.delegatedKeyEvent(e)) === false) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    }, { signal: this.listeners.signal });
-
-    // jstree's restore_focus: returning to the tree resumes at the last
-    // focused node, which the virtual focus here keeps on its own. With it
-    // off, leaving the tree forgets that node.
-    this.element.addEventListener('focusout', (e: FocusEvent) => {
-      if (this.config.core?.restore_focus !== false) return;
-      const next = e.relatedTarget as Node | null;
-      if (next && this.element.contains(next)) return;
-      this.setFocused(null);
-    }, { signal: this.listeners.signal });
-  }
-
-  /**
-   * The keydown as a jstree handler sees it. jstree delegates keydown to the
-   * focused anchor, so `target` and `currentTarget` are that anchor — handlers
-   * conventionally call `this.get_node(e.currentTarget)` — and, being a jQuery
-   * event, it carries the native one as `originalEvent`. Focus here is
-   * virtual, on the container, so the event is presented that way: its
-   * properties read from the native event, and its methods act on it.
-   */
-  private delegatedKeyEvent(e: KeyboardEvent): KeyboardEvent {
-    const anchor = this.focusedId
-      ? this.element.querySelector(`#${CSS.escape(this.focusedId)} > .md-tree-anchor`)
-      : null;
-    return new Proxy(e, {
-      get: (native, prop) => {
-        if (anchor && (prop === 'target' || prop === 'currentTarget')) return anchor;
-        if (prop === 'originalEvent') return native;
-        const value: unknown = Reflect.get(native, prop, native);
-        return typeof value === 'function' ? value.bind(native) : value;
-      },
-    });
-  }
-
-  /**
-   * Resolve a keydown to a handler: jstree's defaults with `core.keyboard`
-   * merged over them, read on every keystroke as jstree does. `false`
-   * disables every shortcut; a null entry disables one.
-   */
-  private keyboardHandlerFor(
-    e: KeyboardEvent,
-    defaults: Record<string, KeyboardHandler>,
-  ): KeyboardHandler | null {
-    const configured = this.config.core?.keyboard;
-    if (configured === false) return null;
-    const combo = comboFromEvent(e);
-    if (!combo) return null;
-
-    const map = new Map<string, KeyboardHandler | null>();
-    for (const [keys, handler] of Object.entries(defaults)) {
-      map.set(normalizeCombo(keys), handler);
-    }
-    if (configured && typeof configured === 'object') {
-      for (const [keys, handler] of Object.entries(configured)) {
-        map.set(normalizeCombo(keys), handler);
-      }
-    }
-    return map.get(combo) ?? null;
-  }
-
-  /** jstree 3.3's default shortcuts, ported to this tree's focus model. */
-  private defaultKeyboard(): Record<string, KeyboardHandler> {
-    return {
-      // aria defines space with ctrl only; plain space is left unbound.
-      'ctrl-space': (e) => this.activateFocused(e),
-      enter: (e) => this.activateFocused(e),
-      left: (e) => {
-        e.preventDefault();
-        const id = this.focusedId;
-        if (!id) return;
-        if (this.is_open(id)) {
-          this.close_node(id);
-        } else {
-          const parent = this.get_parent(id);
-          if (parent && parent !== '#') this.setFocused(parent);
-        }
-      },
-      up: (e) => {
-        e.preventDefault();
-        this.focusStep(this.focusedId ? this.get_prev_dom(this.focusedId) : null);
-      },
-      right: (e) => {
-        e.preventDefault();
-        const id = this.focusedId;
-        if (!id) return;
-        if (this.is_closed(id)) {
-          this.open_node(id);
-        } else if (this.is_open(id)) {
-          const nodeEl = this.element.querySelector(`#${CSS.escape(id)}`);
-          const firstChild = this.get_next_dom(id);
-          if (firstChild && nodeEl?.contains(firstChild)) this.setFocused(firstChild.id);
-        }
-      },
-      down: (e) => {
-        e.preventDefault();
-        this.focusStep(this.focusedId ? this.get_next_dom(this.focusedId) : null);
-      },
-      // aria defines * (numpad) as open_all.
-      '*': () => this.open_all(),
-      home: (e) => {
-        e.preventDefault();
-        this.setFocused(this.getFirstVisibleNodeId());
-      },
-      end: (e) => {
-        e.preventDefault();
-        this.setFocused(this.getLastVisibleNodeId());
-      },
-      f2: (e) => {
-        e.preventDefault();
-        if (this.focusedId) this.edit(this.focusedId);
-      },
-    };
-  }
-
-  /** Arrow-key step: move to `target`, or to the first node when none is focused. */
-  private focusStep(target: HTMLElement | null): void {
-    if (!this.focusedId) {
-      this.setFocused(this.getFirstVisibleNodeId());
-    } else if (target) {
-      this.setFocused(target.id);
-    }
-  }
-
-  /** jstree's enter / ctrl-space: a click on the focused node, keeping modifiers. */
-  private activateFocused(e: KeyboardEvent): void {
-    if (this.focusedId) this.activate_node(this.focusedId, e);
+  edit(obj: NodeRef, defaultText?: string, callback?: EditCallback): void {
+    this.inlineEditor.edit(obj, defaultText, callback);
   }
 
   // ---- Refresh & Load (Phase 8) ----
@@ -2522,7 +2156,7 @@ export class MDFolderTree implements TreePluginHost {
         }
         this.syncSelectionFlags();
 
-        this.renderer.render(this.getRootNodes(), this.getNodeMap());
+        this.renderer.render(this.getRootNodes());
         this.emit(`refresh.${EVENT_NS}`, {});
       },
     });
@@ -2556,13 +2190,13 @@ export class MDFolderTree implements TreePluginHost {
     node.state.failed = false;
     node.state.loading = true;
     node.state.loaded = false;
-    this.renderer.renderSingleNode(node, this.getNodeMap());
+    this.renderer.renderSingleNode(node);
 
     this.fetchChildren(node, (status) => {
       node.state.loading = false;
       node.state.loaded = status;
       node.state.failed = !status;
-      this.renderer.renderSingleNode(node, this.getNodeMap());
+      this.renderer.renderSingleNode(node);
       // As in jstree, the anchor reports that it is no longer busy.
       this.element
         .querySelector(`#${CSS.escape(node.id)} > .md-tree-anchor`)
@@ -2605,7 +2239,7 @@ export class MDFolderTree implements TreePluginHost {
     };
 
     // A node the massload plugin fetched loads from its answer.
-    const massload = this.plugins.find((p) => p.name === 'massload') as MassloadPlugin | undefined;
+    const massload = this.getPlugin<MassloadPlugin>('massload');
     const prefetched = massload?.take(node.id);
     if (prefetched) {
       append(prefetched, () => settle(true));
@@ -2711,7 +2345,7 @@ export class MDFolderTree implements TreePluginHost {
     const finish = (): void => {
       this.reindex();
       this.emitModel(node.children_d, node.id);
-      this.renderer.render(this.getRootNodes(), this.getNodeMap());
+      this.renderer.render(this.getRootNodes());
       done();
     };
     if (json) {
@@ -2845,7 +2479,7 @@ export class MDFolderTree implements TreePluginHost {
       }
     };
     // jstree's massload: fetch the nodes that need loading in one call first.
-    const massload = this.plugins.find((p) => p.name === 'massload') as MassloadPlugin | undefined;
+    const massload = this.getPlugin<MassloadPlugin>('massload');
     if (!massload) {
       pass(force);
       return;
@@ -2919,104 +2553,46 @@ export class MDFolderTree implements TreePluginHost {
     if (this.config.core?.multiple !== false) this.element.setAttribute('aria-multiselectable', 'true');
   }
 
-  /** jstree's theme `init`: the theme, with `responsive`, and its variant. */
-  private applyThemeClasses(): void {
-    const themes = this.config.core?.themes ?? {};
-    this.set_theme(themes.name || 'default', themes.url === false ? undefined : themes.url);
-    this.set_theme_variant(themes.variant ?? false);
-  }
+  /** Plugin factories by the name a tree lists them under. */
+  private static readonly registry = new Map<string, () => TreePlugin>();
 
   /**
-   * jstree's theme `loading`: the dots, icons, stripes and ellipsis flags,
-   * applied through the show / hide methods so their events fire.
+   * Register a plugin under the name trees list it by, replacing whatever
+   * held that name. The built-ins register themselves this way
+   * ([src/plugins/register.ts](src/plugins/register.ts)), so a consumer's own
+   * plugin is built on exactly the same terms.
    */
-  private applyThemeFlags(): void {
-    const themes = this.config.core?.themes ?? {};
-    if (themes.dots === false) this.hide_dots();
-    else this.show_dots();
-    if (themes.icons === false) this.hide_icons();
-    else this.show_icons();
-    if (themes.stripes) this.show_stripes();
-    else this.hide_stripes();
-    if (themes.ellipsis) this.show_ellipsis();
-    else this.hide_ellipsis();
+  static registerPlugin(name: string, factory: () => TreePlugin): void {
+    MDFolderTree.registry.set(name, factory);
+  }
+
+  /** The plugin this tree built under `name`, or null where it has none. */
+  getPlugin<T extends TreePlugin>(name: string): T | null {
+    return (this.pluginsByName.get(name) as T | undefined) ?? null;
+  }
+
+  private get checkboxPlugin(): CheckboxPlugin | null {
+    return this.getPlugin<CheckboxPlugin>('checkbox');
+  }
+
+  private get searchPlugin(): SearchPlugin | null {
+    return this.getPlugin<SearchPlugin>('search');
   }
 
   private initPlugins(): void {
-    const pluginNames = this.config.plugins ?? [];
+    const names = [...(this.config.plugins ?? [])];
+    // Our one divergence: a `types` config enables the plugin without naming
+    // it. It leads, as it did while the order was ours to choose.
+    if (this.config.types && !names.includes('types')) names.unshift('types');
 
-    if (pluginNames.includes('types') || this.config.types) {
-      const p = new TypesPlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('checkbox')) {
-      const p = new CheckboxPlugin();
-      p.init(this);
-      this.plugins.push(p);
-      this.checkboxPlugin = p;
-    }
-
-    if (pluginNames.includes('search')) {
-      const p = new SearchPlugin();
-      p.init(this);
-      this.plugins.push(p);
-      this.searchPlugin = p;
-    }
-
-    if (pluginNames.includes('changed')) {
-      const p = new ChangedPlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('conditionalselect')) {
-      const p = new ConditionalSelectPlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('wholerow')) {
-      const p = new WholerowPlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('sort')) {
-      const p = new SortPlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('unique')) {
-      const p = new UniquePlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('state')) {
-      const p = new StatePlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('contextmenu')) {
-      const p = new ContextMenuPlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('dnd')) {
-      const p = new DndPlugin();
-      p.init(this);
-      this.plugins.push(p);
-    }
-
-    if (pluginNames.includes('massload')) {
-      const p = new MassloadPlugin();
-      p.init(this);
-      this.plugins.push(p);
+    for (const name of names) {
+      const factory = MDFolderTree.registry.get(name);
+      // As in jstree, a name with no plugin behind it is passed over.
+      if (!factory) continue;
+      const plugin = factory();
+      plugin.init(this);
+      this.plugins.push(plugin);
+      this.pluginsByName.set(name, plugin);
     }
   }
 
@@ -3055,7 +2631,7 @@ export class MDFolderTree implements TreePluginHost {
 
     if (emitLifecycle) {
       this.emit(`loading.${EVENT_NS}`, {});
-      this.applyThemeFlags();
+      this.theme.applyFlags();
     }
 
     // Registered up front so `MDFolderTree.getInstance()` resolves inside a
@@ -3071,7 +2647,7 @@ export class MDFolderTree implements TreePluginHost {
       this.reindex();
       this.emitModel(this.rootNode.children_d, '#');
       this.syncSelectionFlags();
-      this.renderer.render(this.getRootNodes(), this.getNodeMap());
+      this.renderer.render(this.getRootNodes());
       finish();
     };
 
@@ -3094,7 +2670,7 @@ export class MDFolderTree implements TreePluginHost {
       // load_node would, as in jstree.
       this.fetchChildren(this.rootNode, () => {
         this.syncSelectionFlags();
-        this.renderer.render(this.getRootNodes(), this.getNodeMap());
+        this.renderer.render(this.getRootNodes());
         finish();
       });
     } else {
@@ -3463,14 +3039,6 @@ export class MDFolderTree implements TreePluginHost {
       .filter((n): n is TreeNode => n !== null);
   }
 
-  private getNodeMap(): Map<string, TreeNode> {
-    const map = new Map<string, TreeNode>();
-    for (const node of this.store.getAll()) {
-      map.set(node.id, node);
-    }
-    return map;
-  }
-
   private createRootNode(): TreeNode {
     return {
       id: '#',
@@ -3521,7 +3089,7 @@ export class MDFolderTree implements TreePluginHost {
         const li = anchor.closest('.md-tree-node') as HTMLElement | null;
         if (li && this.store.has(li.id)) {
           // As jstree does, focus the clicked node, then activate it.
-          this.setFocused(li.id);
+          this.keyboard.setFocused(li.id);
           this.activate_node(li.id, e);
         }
       }
