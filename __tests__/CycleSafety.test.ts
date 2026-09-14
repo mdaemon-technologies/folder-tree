@@ -92,11 +92,16 @@ describe('Cycle safety', () => {
 
       tree.moveNode('p', 'k', 0);
 
-      expect(tree.last_error()).toMatchObject({ error: 'cycle', operation: 'move_node', id: 'p' });
+      expect(tree.last_error()).toMatchObject({
+        error: 'check',
+        plugin: 'core',
+        id: 'core_01',
+        reason: 'Moving parent inside child',
+      });
     });
 
     it('should still allow a legitimate move to an unrelated parent', () => {
-      const tree = new MDFolderTree(container, { core: { data: nested } });
+      const tree = new MDFolderTree(container, { core: { data: nested, check_callback: true } });
 
       expect(tree.moveNode('k', 'other', 0)).toBe(true);
       expect(tree.getNode('k')!.parent).toBe('other');
@@ -104,15 +109,13 @@ describe('Cycle safety', () => {
   });
 
   describe('copyNode', () => {
-    // A copy always receives a fresh id, so placing one inside the source
-    // subtree is legal and cannot create a cycle.
-    it('should allow copying a node into its own descendant', () => {
+    // jstree refuses copying a node into itself or its own descendant (check()
+    // error core_01), even though the copy itself would get fresh ids.
+    it('should refuse copying a node into its own descendant, as jstree does', () => {
       const tree = new MDFolderTree(container, { core: { data: nested } });
 
-      const newId = tree.copyNode('p', 'k', 0);
-
-      expect(newId).not.toBe(false);
-      expect(tree.getNode(newId as string)!.parent).toBe('k');
+      expect(tree.copyNode('p', 'k', 0)).toBe(false);
+      expect(tree.getNode('k')!.children).toEqual(['g']);
     });
   });
 });

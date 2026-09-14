@@ -60,7 +60,7 @@
   color: #333 !important;
 }
 
-.md-tree-disabled > .md-tree-anchor {
+.md-tree-anchor.md-tree-disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -144,6 +144,19 @@
   display: none;
 }
 
+/*
+ * The theme icon (icon: true, the default) and jstree's stock folder / file
+ * classes, which the migration codemod renames to md-tree-folder / md-tree-file.
+ */
+.md-tree-themeicon:not(.md-tree-themeicon-custom),
+.md-tree-folder {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23e8a93c' d='M1.5 3A1.5 1.5 0 0 0 0 4.5v8A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 14.5 4H7.4L6 2.6A2 2 0 0 0 4.6 2H1.5z'/%3E%3C/svg%3E");
+}
+
+.md-tree-file {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%2390a4ae' d='M3 1h6.5L13 4.5V15H3z'/%3E%3Cpath fill='%23cfd8dc' d='M9.5 1v3.5H13z'/%3E%3C/svg%3E");
+}
+
 .md-tree-search {
   background: #fff3cd;
   border-radius: 2px;
@@ -164,6 +177,15 @@
   cursor: pointer;
   box-sizing: border-box;
   flex-shrink: 0;
+}
+
+.md-tree-checkbox-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.md-tree-no-checkboxes .md-tree-checkbox {
+  display: none;
 }
 
 .md-tree-checked > .md-tree-anchor > .md-tree-checkbox {
@@ -214,15 +236,23 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: -1;
   border-radius: 3px;
 }
 
+/* The anchor sits above the strip, which takes the rest of the row's clicks. */
+.md-tree-wholerow-ul .md-tree-anchor,
+.md-tree-wholerow-ul .md-tree-ocl {
+  position: relative;
+  z-index: 1;
+}
+
+.md-tree-wholerow-hovered,
 .md-tree-wholerow-ul .md-tree-anchor:hover ~ .md-tree-wholerow,
 .md-tree-wholerow-ul .md-tree-hovered ~ .md-tree-wholerow {
   background: rgba(0, 0, 0, 0.04);
 }
 
+.md-tree-wholerow-clicked,
 .md-tree-wholerow-ul .md-tree-clicked ~ .md-tree-wholerow {
   background: rgba(3, 102, 214, 0.08);
 }
@@ -364,4 +394,29 @@
   outline: 2px solid #0366d6;
   outline-offset: -1px;
   border-radius: 3px;
+}
+
+/* jstree's drop marker (its `#jstree-marker`), beside the target anchor. */
+#md-tree-marker {
+  position: absolute;
+  z-index: 10001;
+  width: 0;
+  height: 0;
+  margin-top: -5px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 5px solid #333;
+  pointer-events: none;
+}
+
+.md-tree-dnd-parent > .md-tree-anchor {
+  outline: 1px dashed currentColor;
+}
+
+#md-tree-dnd .md-tree-ok::before {
+  content: '\2713';
+}
+
+#md-tree-dnd .md-tree-er::before {
+  content: '\2715';
 }

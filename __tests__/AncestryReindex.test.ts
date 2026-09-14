@@ -29,7 +29,7 @@ describe('Ancestry reindexing', () => {
     { id: 'other', text: 'Other' },
   ];
 
-  const build = () => new MDFolderTree(container, { core: { data } });
+  const build = () => new MDFolderTree(container, { core: { data, check_callback: true } });
 
   describe('children_d holds deep descendants', () => {
     it('should include grandchildren after load', () => {

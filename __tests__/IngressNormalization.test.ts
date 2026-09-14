@@ -63,7 +63,8 @@ describe('Ingress normalization', () => {
       const child = tree.getNodeChildren('root')[0];
       expect(child.type).toBe('default');
       expect(child.state.selected).toBe(false);
-      expect(child.li_attr).toEqual({});
+      // As in jstree, li_attr.id defaults to the node id.
+      expect(child.li_attr).toEqual({ id: child.id });
     });
   });
 
@@ -90,7 +91,7 @@ describe('Ingress normalization', () => {
 
   describe('createNode', () => {
     it('should not render the string "undefined" when text is omitted', () => {
-      const tree = new MDFolderTree(container, { core: { data: [{ id: 'a', text: 'A' }] } });
+      const tree = new MDFolderTree(container, { core: { data: [{ id: 'a', text: 'A' }], check_callback: true } });
 
       const created = tree.createNode('#', {} as TreeNodeData);
 

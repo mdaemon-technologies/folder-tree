@@ -187,7 +187,7 @@ describe('Core Utility Methods', () => {
   // set_id
   test('set_id changes a node ID', () => {
     expect(tree.set_id('root-2', 'renamed-root')).toBe(true);
-    expect(tree.get_node('root-2')).toBeNull();
+    expect(tree.get_node('root-2')).toBe(false);
     expect(tree.get_node('renamed-root')).not.toBeNull();
     expect(tree.get_text('renamed-root')).toBe('Root Two');
   });

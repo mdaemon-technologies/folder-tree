@@ -36,11 +36,12 @@ describe('Clipboard (cut/copy/paste)', () => {
     document.body.removeChild(container);
   });
 
-  test('cut stores buffer with mode cut', () => {
+  // As jstree's get_buffer, the mode is the operation paste will perform.
+  test('cut stores buffer with mode move_node', () => {
     tree.cut('file-1');
     const buffer = tree.get_buffer();
     expect(buffer).not.toBeNull();
-    expect(buffer!.mode).toBe('cut');
+    expect(buffer!.mode).toBe('move_node');
     expect(buffer!.ids).toEqual(['file-1']);
   });
 
@@ -50,10 +51,10 @@ describe('Clipboard (cut/copy/paste)', () => {
     expect(el!.classList.contains('md-tree-cut')).toBe(true);
   });
 
-  test('copy stores buffer with mode copy', () => {
+  test('copy stores buffer with mode copy_node', () => {
     tree.copy(['file-1', 'file-2']);
     const buffer = tree.get_buffer();
-    expect(buffer!.mode).toBe('copy');
+    expect(buffer!.mode).toBe('copy_node');
     expect(buffer!.ids).toEqual(['file-1', 'file-2']);
   });
 
@@ -96,7 +97,8 @@ describe('Clipboard (cut/copy/paste)', () => {
   test('paste clears buffer', () => {
     tree.cut('file-1');
     tree.paste('folder-2');
-    expect(tree.get_buffer()).toBeNull();
+    // jstree reports an empty buffer with its fields false, not null.
+    expect(tree.get_buffer().mode).toBe(false);
     expect(tree.can_paste()).toBe(false);
   });
 

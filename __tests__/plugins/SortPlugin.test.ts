@@ -58,7 +58,10 @@ describe('SortPlugin', () => {
     const tree = new MDFolderTree(container, {
       core: { data: unsortedData },
       plugins: ['sort'],
-      sort: (a, b) => b.text.localeCompare(a.text), // Reverse order
+      // jstree passes node ids, with the tree as `this`. Reverse order.
+      sort: function (this: MDFolderTree, a: string, b: string) {
+        return (this.get_text(b) as string).localeCompare(this.get_text(a) as string);
+      },
     });
 
     const parent = tree.getNode('parent');

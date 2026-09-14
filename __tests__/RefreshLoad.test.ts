@@ -72,12 +72,14 @@ describe('Refresh & Load', () => {
     }, 50);
   });
 
-  test('load_node returns false for non-callback data', () => {
+  test('load_node returns true for an existing node even when static data cannot load it, as jstree does', () => {
     const tree = new MDFolderTree(container, {
       core: { data: [{ id: 'n1', text: 'Node' }] },
     });
-    const result = tree.load_node('n1');
-    expect(result).toBe(false);
+    const callback = jest.fn();
+    const result = tree.load_node('n1', callback);
+    expect(result).toBe(true);
+    expect(callback).toHaveBeenCalledWith(expect.objectContaining({ id: 'n1' }), false);
   });
 
   test('load_node emits load_node event', (done) => {
@@ -123,8 +125,13 @@ describe('Refresh & Load', () => {
 
     setTimeout(() => {
       tree.load_all(undefined, () => {
-        expect(handler).toHaveBeenCalled();
-        done();
+        // As in jstree, the callback runs just before load_all is emitted.
+        expect(handler).not.toHaveBeenCalled();
+        setTimeout(() => {
+          expect(handler).toHaveBeenCalledTimes(1);
+          expect(tree.get_node('a-child')).not.toBe(false);
+          done();
+        }, 0);
       });
     }, 50);
   });

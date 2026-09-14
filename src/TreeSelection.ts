@@ -1,18 +1,20 @@
 /**
- * Manages the set of selected node IDs.
+ * The set of selected node ids.
+ *
+ * Deliberately policy-free: `core.multiple` is not enforced here. As in
+ * jstree, it constrains user interaction (see `MDFolderTree.activate_node`),
+ * while the programmatic selection API may select any number of nodes.
  */
 export class TreeSelection {
   private selected: Set<string> = new Set();
-  private multiple: boolean;
 
-  constructor(multiple: boolean = true) {
-    this.multiple = multiple;
-  }
+  /**
+   * @param _multiple Ignored. Retained so existing callers still compile;
+   * `core.multiple` is enforced on activation instead.
+   */
+  constructor(_multiple = true) {}
 
   select(id: string): string[] {
-    if (!this.multiple) {
-      this.selected.clear();
-    }
     this.selected.add(id);
     return this.getSelected();
   }
@@ -22,13 +24,9 @@ export class TreeSelection {
     return this.getSelected();
   }
 
-  /**
-   * Delegates to `select` per id so single-select mode is enforced here too
-   * rather than being bypassed by a bulk add.
-   */
   selectAll(ids: string[]): string[] {
     for (const id of ids) {
-      this.select(id);
+      this.selected.add(id);
     }
     return this.getSelected();
   }
@@ -46,7 +44,8 @@ export class TreeSelection {
     return Array.from(this.selected);
   }
 
-  setMultiple(multiple: boolean): void {
-    this.multiple = multiple;
+  /** @deprecated No-op; `core.multiple` is enforced on activation. */
+  setMultiple(_multiple: boolean): void {
+    // Intentionally empty.
   }
 }

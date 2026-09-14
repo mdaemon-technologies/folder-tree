@@ -1,6 +1,8 @@
 import { MDFolderTree } from '../src/MDFolderTree';
 import type { TreeNodeData } from '../src/types';
 
+// get_state / set_state in jstree's shape, `{ core: { open, selected, ... } }`;
+// StateParity.test.ts covers the rest of the contract.
 describe('State API (get_state / set_state)', () => {
   let container: HTMLElement;
   let tree: MDFolderTree;
@@ -28,29 +30,29 @@ describe('State API (get_state / set_state)', () => {
     document.body.removeChild(container);
   });
 
-  test('get_state returns opened and selected arrays', () => {
+  test('get_state reports the open and selected nodes', () => {
     tree.open_node('folder');
     tree.select_node('file-1');
     const state = tree.get_state();
-    expect(state.opened).toContain('folder');
-    expect(state.selected).toContain('file-1');
+    expect(state.core!.open).toContain('folder');
+    expect(state.core!.selected).toContain('file-1');
   });
 
-  test('get_state returns empty arrays when nothing is opened/selected', () => {
+  test('get_state reports empty lists when nothing is open or selected', () => {
     const state = tree.get_state();
-    expect(state.selected).toEqual([]);
+    expect(state.core!.selected).toEqual([]);
+    expect(state.core!.open).toEqual([]);
   });
 
-  test('set_state restores opened and selected nodes', () => {
-    const savedState = { opened: ['folder'], selected: ['file-2'] };
-    tree.set_state(savedState);
+  test('set_state restores open and selected nodes', () => {
+    tree.set_state({ core: { open: ['folder'], selected: ['file-2'] } });
     expect(tree.is_open('folder')).toBe(true);
     expect(tree.is_selected('file-2')).toBe(true);
   });
 
-  test('set_state deselects previously selected nodes', () => {
+  test('set_state replaces the selection', () => {
     tree.select_node('file-1');
-    tree.set_state({ opened: [], selected: ['file-2'] });
+    tree.set_state({ core: { selected: ['file-2'] } });
     expect(tree.is_selected('file-1')).toBe(false);
     expect(tree.is_selected('file-2')).toBe(true);
   });
@@ -58,13 +60,13 @@ describe('State API (get_state / set_state)', () => {
   test('set_state emits set_state event', () => {
     const handler = jest.fn();
     container.addEventListener('set_state.MDFolderTree', handler);
-    tree.set_state({ opened: ['folder'], selected: [] });
+    tree.set_state({ core: { open: ['folder'], selected: [] } });
     expect(handler).toHaveBeenCalled();
   });
 
   test('set_state calls callback when provided', () => {
     const cb = jest.fn();
-    tree.set_state({ opened: [], selected: [] }, cb);
+    tree.set_state({ core: { open: [], selected: [] } }, cb);
     expect(cb).toHaveBeenCalled();
   });
 });

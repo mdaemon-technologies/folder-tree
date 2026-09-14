@@ -49,8 +49,9 @@ const tree = new MDFolderTree(document.getElementById('tree')!, {
   plugins: ['types'],
 });
 
-// Select a node
-tree.select_node('node-1');
+// Select a node once the tree is ready. As in jstree, data loads
+// asynchronously: JSON is built in a Web Worker where one is available.
+tree.on('ready.MDFolderTree', () => tree.select_node('node-1'));
 
 // Listen for events
 document.getElementById('tree')!.addEventListener('changed.MDFolderTree', (e) => {
@@ -87,6 +88,11 @@ const instance = mdTree('#tree', true);
 // Before: $('#tree').jstree('select_node', 'node-1')
 mdTree('#tree', 'select_node', 'node-1');
 ```
+
+As with jstree, call node methods once the tree has emitted `ready`: JSON data
+is built in a Web Worker where one is available (`core.worker`, on by
+default), so it arrives after the constructor returns. Set `core.worker: false`
+to build it synchronously.
 
 #### Step-by-step migration
 
@@ -264,12 +270,12 @@ core: {
 
 ```bash
 npm install
-npm run build        # Production ESM/CJS build
-npm run build:umd    # UMD bundle
-npm run build:all    # Both
+npm run build        # ESM/CJS and UMD builds
+npm run build:umd    # UMD bundle only
 npm run dev          # Watch mode
 npm test             # Run tests
 npm run typecheck    # TypeScript check
+npm run lint         # ESLint
 ```
 
 ## License

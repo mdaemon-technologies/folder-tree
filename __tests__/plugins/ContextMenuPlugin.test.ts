@@ -4,6 +4,9 @@ import type { TreeNodeData } from '../../src/types';
 describe('ContextMenuPlugin', () => {
   let container: HTMLElement;
 
+  /** An item's own label, without jstree's spacer. */
+  const label = (li: Element) => (li.querySelector(':scope > a')?.textContent ?? '').trim();
+
   const sampleData: TreeNodeData[] = [
     { id: 'n1', text: 'Node 1', children: [{ id: 'n1-1', text: 'Child 1' }] },
     { id: 'n2', text: 'Node 2' },
@@ -19,7 +22,7 @@ describe('ContextMenuPlugin', () => {
     if (instance) instance.destroy();
     document.body.removeChild(container);
     // Clean up any leaked context menus
-    document.querySelectorAll('.md-tree-contextmenu').forEach((el) => el.remove());
+    document.querySelectorAll('.vakata-context').forEach((el) => el.remove());
   });
 
   it('should register without errors', () => {
@@ -48,7 +51,7 @@ describe('ContextMenuPlugin', () => {
     });
     anchor.dispatchEvent(event);
 
-    const menu = document.querySelector('.md-tree-contextmenu');
+    const menu = document.querySelector('.vakata-context');
     expect(menu).not.toBeNull();
   });
 
@@ -61,11 +64,11 @@ describe('ContextMenuPlugin', () => {
     const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
     anchor.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
 
-    const menu = document.querySelector('.md-tree-contextmenu');
+    const menu = document.querySelector('.vakata-context');
     const items = menu?.querySelectorAll('li[role="menuitem"]');
     expect(items?.length).toBeGreaterThanOrEqual(3);
 
-    const texts = Array.from(items!).map((li) => li.textContent);
+    const texts = Array.from(items!).map(label);
     expect(texts).toContain('Create');
     expect(texts).toContain('Rename');
     expect(texts).toContain('Delete');
@@ -85,9 +88,9 @@ describe('ContextMenuPlugin', () => {
     const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
     anchor.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
 
-    const menu = document.querySelector('.md-tree-contextmenu');
+    const menu = document.querySelector('.vakata-context');
     const items = menu?.querySelectorAll('li[role="menuitem"]');
-    const texts = Array.from(items!).map((li) => li.textContent);
+    const texts = Array.from(items!).map(label);
     expect(texts).toContain('Custom Action');
   });
 
@@ -106,7 +109,7 @@ describe('ContextMenuPlugin', () => {
     anchor.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
 
     expect(itemsFn).toHaveBeenCalled();
-    const menu = document.querySelector('.md-tree-contextmenu');
+    const menu = document.querySelector('.vakata-context');
     expect(menu?.textContent).toContain('Dynamic Item');
   });
 
@@ -119,10 +122,10 @@ describe('ContextMenuPlugin', () => {
     const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
     anchor.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
 
-    expect(document.querySelector('.md-tree-contextmenu')).not.toBeNull();
+    expect(document.querySelector('.vakata-context')).not.toBeNull();
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(document.querySelector('.md-tree-contextmenu')).toBeNull();
+    expect(document.querySelector('.vakata-context')).toBeNull();
   });
 
   it('should dismiss on click outside', () => {
@@ -134,11 +137,11 @@ describe('ContextMenuPlugin', () => {
     const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
     anchor.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
 
-    expect(document.querySelector('.md-tree-contextmenu')).not.toBeNull();
+    expect(document.querySelector('.vakata-context')).not.toBeNull();
 
     // Click outside
     document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    expect(document.querySelector('.md-tree-contextmenu')).toBeNull();
+    expect(document.querySelector('.vakata-context')).toBeNull();
   });
 
   it('should select node on right-click by default', () => {
@@ -189,9 +192,9 @@ describe('ContextMenuPlugin', () => {
 
     const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
     anchor.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    expect(document.querySelector('.md-tree-contextmenu')).not.toBeNull();
+    expect(document.querySelector('.vakata-context')).not.toBeNull();
 
     tree.destroy();
-    expect(document.querySelector('.md-tree-contextmenu')).toBeNull();
+    expect(document.querySelector('.vakata-context')).toBeNull();
   });
 });

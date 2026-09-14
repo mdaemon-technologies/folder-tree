@@ -108,20 +108,19 @@ describe('Checkbox Plugin - Full API', () => {
     expect(und).toContain('parent');
   });
 
+  // As jstree, a container class, so a redraw cannot bring them back.
   test('show_checkboxes / hide_checkboxes toggles visibility', () => {
     tree.hide_checkboxes();
-    const cb = container.querySelector('.md-tree-checkbox') as HTMLElement;
-    expect(cb.style.display).toBe('none');
+    expect(container.classList.contains('md-tree-no-checkboxes')).toBe(true);
     tree.show_checkboxes();
-    expect(cb.style.display).toBe('');
+    expect(container.classList.contains('md-tree-no-checkboxes')).toBe(false);
   });
 
   test('toggle_checkboxes toggles state', () => {
     tree.toggle_checkboxes();
-    const cb = container.querySelector('.md-tree-checkbox') as HTMLElement;
-    expect(cb.style.display).toBe('none');
+    expect(container.classList.contains('md-tree-no-checkboxes')).toBe(true);
     tree.toggle_checkboxes();
-    expect(cb.style.display).toBe('');
+    expect(container.classList.contains('md-tree-no-checkboxes')).toBe(false);
   });
 
   test('disable_checkbox adds disabled class', () => {
@@ -137,16 +136,19 @@ describe('Checkbox Plugin - Full API', () => {
     expect(cb!.classList.contains('md-tree-checkbox-disabled')).toBe(false);
   });
 
-  test('check_node emits event', () => {
+  // With tie_selection (the default) jstree's check_node *is* select_node, so
+  // the selection events fire. check_node / uncheck_node events fire only when
+  // tie_selection is false (covered in ActivationParity.test.ts).
+  test('check_node emits select_node when tie_selection is on', () => {
     const handler = jest.fn();
-    container.addEventListener('check_node.MDFolderTree', handler);
+    container.addEventListener('select_node.MDFolderTree', handler);
     tree.check_node('solo');
     expect(handler).toHaveBeenCalled();
   });
 
-  test('uncheck_node emits event', () => {
+  test('uncheck_node emits deselect_node when tie_selection is on', () => {
     const handler = jest.fn();
-    container.addEventListener('uncheck_node.MDFolderTree', handler);
+    container.addEventListener('deselect_node.MDFolderTree', handler);
     tree.check_node('solo');
     tree.uncheck_node('solo');
     expect(handler).toHaveBeenCalled();

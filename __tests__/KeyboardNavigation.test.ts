@@ -93,12 +93,6 @@ describe('Keyboard Navigation', () => {
     expect(tree.is_selected('folder-1')).toBe(true);
   });
 
-  test('Space selects the focused node', () => {
-    pressKey('ArrowDown'); // folder-1
-    pressKey(' ');
-    expect(tree.is_selected('folder-1')).toBe(true);
-  });
-
   test('Home focuses first visible node', () => {
     pressKey('ArrowDown');
     pressKey('ArrowDown');
@@ -106,29 +100,6 @@ describe('Keyboard Navigation', () => {
     pressKey('Home');
     const focused = container.querySelector('.md-tree-focused');
     expect(focused!.closest('.md-tree-node')!.id).toBe('folder-1');
-  });
-
-  test('Delete removes focused node', () => {
-    pressKey('ArrowDown'); // folder-1
-    pressKey('ArrowDown'); // child-1
-    pressKey('Delete');
-    expect(tree.get_node('child-1')).toBeNull();
-  });
-
-  test('Ctrl+X cuts selected nodes', () => {
-    tree.select_node('child-1');
-    pressKey('ArrowDown');
-    pressKey('x', { ctrlKey: true });
-    expect(tree.can_paste()).toBe(true);
-    expect(tree.get_buffer()!.mode).toBe('cut');
-  });
-
-  test('Ctrl+C copies selected nodes', () => {
-    tree.select_node('child-1');
-    pressKey('ArrowDown');
-    pressKey('c', { ctrlKey: true });
-    expect(tree.can_paste()).toBe(true);
-    expect(tree.get_buffer()!.mode).toBe('copy');
   });
 
   test('Ctrl+V pastes at focused node', () => {

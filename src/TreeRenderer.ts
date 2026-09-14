@@ -11,6 +11,7 @@ export class TreeRenderer {
   private container: HTMLElement;
   private plugins: TreePlugin[] = [];
   private sanitizeAttrs: boolean;
+  private computePositions: boolean;
   private themeName = 'default';
   private onError?: (error: Record<string, unknown>) => void;
 
@@ -19,11 +20,13 @@ export class TreeRenderer {
     plugins: TreePlugin[] = [],
     sanitizeAttrs = true,
     onError?: (error: Record<string, unknown>) => void,
+    computePositions = false,
   ) {
     this.container = container;
     this.plugins = plugins;
     this.sanitizeAttrs = sanitizeAttrs;
     this.onError = onError;
+    this.computePositions = computePositions;
   }
 
   /**
@@ -73,8 +76,7 @@ export class TreeRenderer {
 
     const fragment = document.createDocumentFragment();
     for (let i = 0; i < processedNodes.length; i++) {
-      const isLast = i === processedNodes.length - 1;
-      fragment.appendChild(this.renderNode(processedNodes[i], nodeMap, isLast));
+      fragment.appendChild(this.renderNode(processedNodes[i], nodeMap, i, processedNodes.length));
     }
     rootUl.appendChild(fragment);
     this.container.appendChild(rootUl);
@@ -88,15 +90,28 @@ export class TreeRenderer {
     const parent = existing.parentElement;
     if (!parent) return;
 
-    const isLast = !existing.nextElementSibling;
-    const newEl = this.renderNode(node, nodeMap, isLast);
+    // The node's place among its siblings, which aria-posinset reports.
+    const siblings = Array.from(parent.children).filter((el) => el.classList.contains('md-tree-node'));
+    const index = siblings.indexOf(existing);
+    const newEl = this.renderNode(node, nodeMap, index === -1 ? 0 : index, siblings.length);
     parent.replaceChild(newEl, existing);
   }
 
-  private renderNode(node: TreeNode, nodeMap: Map<string, TreeNode>, isLast: boolean): HTMLElement {
+  /** Add a space-separated class list, as jstree does for li_attr / a_attr. */
+  private addClasses(el: HTMLElement, classes: string | undefined): void {
+    if (classes) el.classList.add(...classes.split(/\s+/).filter(Boolean));
+  }
+
+  /**
+   * Render one node. `index` and `total` are its place among its siblings,
+   * which `aria-posinset` / `aria-setsize` report and `md-tree-last` uses.
+   */
+  private renderNode(node: TreeNode, nodeMap: Map<string, TreeNode>, index: number, total: number): HTMLElement {
+    const isLast = index === total - 1;
     const li = document.createElement('li');
     li.id = node.id;
-    li.setAttribute('role', 'treeitem');
+    // As in jstree, the anchor is the treeitem; the <li> only groups it.
+    li.setAttribute('role', 'none');
 
     // State classes
     const hasChildren = node.children.length > 0 || node.state.loading || !node.state.loaded;
@@ -108,19 +123,15 @@ export class TreeRenderer {
     if (isLast) {
       li.classList.add('md-tree-last');
     }
-    if (node.state.disabled) {
-      li.classList.add('md-tree-disabled');
-    }
     if (node.state.hidden) {
       li.classList.add('md-tree-hidden');
     }
-
-    // Accessibility
-    li.setAttribute('aria-expanded', String(node.state.opened));
-    li.setAttribute('aria-selected', String(node.state.selected));
-    if (node.state.disabled) {
-      li.setAttribute('aria-disabled', 'true');
+    // As in jstree, a node reports that it is loading for as long as it is.
+    if (node.state.loading) {
+      li.classList.add('md-tree-loading');
     }
+    // As in jstree, li_attr.class adds to the node's own classes.
+    this.addClasses(li, node.li_attr.class);
 
     // li_attr
     for (const [key, value] of Object.entries(node.li_attr)) {
@@ -141,9 +152,33 @@ export class TreeRenderer {
     anchor.className = 'md-tree-anchor';
     anchor.setAttribute('href', '#');
     anchor.setAttribute('tabindex', '-1');
+    // As in jstree, every aria attribute lives on the anchor: the level always,
+    // expansion only for a node that can hold children, and the positions only
+    // when core.compute_elements_positions asks for them.
+    anchor.setAttribute('role', 'treeitem');
+    anchor.setAttribute('aria-selected', String(node.state.selected));
+    anchor.setAttribute('aria-level', String(node.parents.length));
+    if (hasChildren) {
+      anchor.setAttribute('aria-expanded', String(node.state.opened && node.state.loaded));
+    }
+    if (node.state.disabled) {
+      anchor.setAttribute('aria-disabled', 'true');
+    }
+    if (node.state.loading) {
+      anchor.setAttribute('aria-busy', 'true');
+    }
+    if (this.computePositions) {
+      anchor.setAttribute('aria-setsize', String(total));
+      anchor.setAttribute('aria-posinset', String(index + 1));
+    }
     if (node.state.selected) {
       anchor.classList.add('md-tree-clicked');
     }
+    // jstree marks a disabled node on its anchor.
+    if (node.state.disabled) {
+      anchor.classList.add('md-tree-disabled');
+    }
+    this.addClasses(anchor, node.a_attr.class);
 
     // a_attr
     for (const [key, value] of Object.entries(node.a_attr)) {
@@ -153,13 +188,22 @@ export class TreeRenderer {
       }
     }
 
-    // Type icon
+    // Icon, as jstree renders it: true is the theme icon, false hides it, a
+    // string containing '/' or '.' is an image URL, and any other string is a
+    // class list (such as Font Awesome's 'fa fa-folder').
     const themeIcon = document.createElement('i');
     themeIcon.className = 'md-tree-icon md-tree-themeicon';
-    if (node.icon !== false && node.icon) {
-      themeIcon.classList.add(node.icon, 'md-tree-themeicon-custom');
-    } else if (node.icon === false) {
+    if (node.icon === false) {
       themeIcon.classList.add('md-tree-themeicon-hidden');
+    } else if (typeof node.icon === 'string' && node.icon) {
+      if (node.icon.includes('/') || node.icon.includes('.')) {
+        themeIcon.style.backgroundImage = `url("${node.icon.replace(/["\\]/g, '\\$&')}")`;
+      } else {
+        this.addClasses(themeIcon, node.icon);
+      }
+      themeIcon.classList.add('md-tree-themeicon-custom');
+      // jstree keeps a custom icon in `rel`, which show_icon reads back.
+      themeIcon.setAttribute('rel', node.icon);
     }
     themeIcon.setAttribute('role', 'presentation');
     anchor.appendChild(themeIcon);
@@ -186,8 +230,7 @@ export class TreeRenderer {
       for (let i = 0; i < node.children.length; i++) {
         const childNode = nodeMap.get(node.children[i]);
         if (childNode) {
-          const childIsLast = i === node.children.length - 1;
-          childUl.appendChild(this.renderNode(childNode, nodeMap, childIsLast));
+          childUl.appendChild(this.renderNode(childNode, nodeMap, i, node.children.length));
         }
       }
       li.appendChild(childUl);

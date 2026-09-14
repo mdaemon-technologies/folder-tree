@@ -29,9 +29,15 @@ describe('Selection consistency', () => {
   const flaggedIds = (tree: MDFolderTree) =>
     tree.getAllNodes().filter((n) => n.state.selected).map((n) => n.id);
   const clickedCount = () => container.querySelectorAll('.md-tree-clicked').length;
+  const click = (id: string, init: MouseEventInit = {}) =>
+    (container.querySelector(`#${id} > .md-tree-anchor`) as HTMLElement)
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init }));
 
   describe('single-select mode', () => {
-    it('should honor multiple:false for nodes preselected in the data', () => {
+    it('should keep every preselected node under multiple:false, as jstree does', () => {
+      // jstree applies `multiple` to interaction only; nodes preselected in
+      // the data are all selected. What matters is that flags, the selection
+      // set and the DOM agree.
       const tree = new MDFolderTree(container, {
         core: {
           multiple: false,
@@ -42,29 +48,32 @@ describe('Selection consistency', () => {
         },
       });
 
-      expect(tree.get_selected()).toHaveLength(1);
-      expect(flaggedIds(tree)).toEqual(tree.get_selected());
-      expect(clickedCount()).toBe(1);
+      expect([...tree.get_selected()].sort()).toEqual(['a', 'b']);
+      expect(flaggedIds(tree).sort()).toEqual([...tree.get_selected()].sort());
+      expect(clickedCount()).toBe(2);
     });
 
-    it('should clear the previous flag when selecting another node', () => {
+    it('should clear the previous flag when a click replaces the selection', () => {
       const tree = new MDFolderTree(container, { core: { multiple: false, data } });
 
-      tree.selectNode('a');
-      tree.selectNode('b');
+      click('a');
+      click('b', { ctrlKey: true });
 
       expect(tree.get_selected()).toEqual(['b']);
       expect(flaggedIds(tree)).toEqual(['b']);
       expect(clickedCount()).toBe(1);
     });
 
-    it('should not select everything on select_all', () => {
+    it('should still select every node on select_all, as jstree does', () => {
+      // `core.multiple` constrains interaction (jstree enforces it in
+      // `activate_node`), not the programmatic API: jstree's `select_all`
+      // selects the whole tree regardless of the setting.
       const tree = new MDFolderTree(container, { core: { multiple: false, data } });
 
       tree.select_all();
 
-      expect(tree.get_selected()).toHaveLength(1);
-      expect(flaggedIds(tree)).toEqual(tree.get_selected());
+      expect(tree.get_selected().sort()).toEqual(['a', 'b', 'c']);
+      expect(flaggedIds(tree).sort()).toEqual(tree.get_selected().sort());
     });
   });
 
@@ -79,7 +88,7 @@ describe('Selection consistency', () => {
       expect(clickedCount()).toBe(3);
     });
 
-    it('should not select disabled nodes', () => {
+    it('should include disabled nodes in select_all, as jstree does', () => {
       const tree = new MDFolderTree(container, {
         core: {
           data: [
@@ -91,8 +100,8 @@ describe('Selection consistency', () => {
 
       tree.select_all();
 
-      expect(tree.get_selected()).toEqual(['a']);
-      expect(flaggedIds(tree)).toEqual(['a']);
+      expect([...tree.get_selected()].sort()).toEqual(['a', 'off']);
+      expect(flaggedIds(tree).sort()).toEqual(['a', 'off']);
     });
 
     it('should clear flags on deselect_all', () => {

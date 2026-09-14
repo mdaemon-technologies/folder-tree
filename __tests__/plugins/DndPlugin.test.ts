@@ -83,7 +83,8 @@ describe('DndPlugin', () => {
 
     const helper = document.querySelector('.md-tree-dnd-helper');
     expect(helper).not.toBeNull();
-    expect(helper?.textContent).toBe('File A');
+    // As in jstree, the helper also holds the (hidden) copy sign.
+    expect(helper?.textContent).toContain('File A');
 
     // Clean up
     document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));

@@ -32,7 +32,7 @@ describe('Sort consistency', () => {
     },
   ];
 
-  const build = () => new MDFolderTree(container, { core: { data }, plugins: ['sort'] });
+  const build = () => new MDFolderTree(container, { core: { data, check_callback: true }, plugins: ['sort'] });
   const childDom = () =>
     Array.from(container.querySelectorAll('#p > .md-tree-children > .md-tree-node')).map((e) => e.id);
 
@@ -68,6 +68,7 @@ describe('Sort consistency', () => {
           { id: 'p', text: 'P', state: { opened: true }, children: [{ id: 'zebra', text: 'Zebra' }] },
           { id: 'q', text: 'Q', state: { opened: true }, children: [{ id: 'mango', text: 'Mango' }] },
         ],
+        check_callback: true,
       },
       plugins: ['sort'],
     });
@@ -91,7 +92,10 @@ describe('Sort consistency', () => {
     const tree = new MDFolderTree(container, {
       core: { data },
       plugins: ['sort'],
-      sort: (a, b) => b.text.localeCompare(a.text),
+      // jstree passes node ids, with the tree as `this`. Reverse order.
+      sort: function (this: MDFolderTree, a: string, b: string) {
+        return (this.get_text(b) as string).localeCompare(this.get_text(a) as string);
+      },
     });
 
     expect(tree.getNode('p')!.children).toEqual(['zebra', 'mango']);

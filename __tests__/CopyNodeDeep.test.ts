@@ -35,7 +35,7 @@ describe('copyNode deep copy', () => {
     { id: 'dest', text: 'Destination' },
   ];
 
-  const build = () => new MDFolderTree(container, { core: { data } });
+  const build = () => new MDFolderTree(container, { core: { data, check_callback: true } });
 
   describe('subtree structure', () => {
     it('should copy descendants rather than producing a childless node', () => {
@@ -123,7 +123,8 @@ describe('copyNode deep copy', () => {
       const newId = tree.copyNode('src', 'dest', 0) as string;
 
       expect(tree.getNode(newId)!.li_attr).not.toBe(tree.getNode('src')!.li_attr);
-      expect(tree.getNode(newId)!.li_attr).toEqual({ 'data-tag': 'original' });
+      // As in jstree, the copy's li_attr.id is its own id.
+      expect(tree.getNode(newId)!.li_attr).toEqual({ 'data-tag': 'original', id: newId });
     });
 
     it('should not share the a_attr or state objects with the source', () => {
@@ -161,6 +162,7 @@ describe('copyNode deep copy', () => {
             { id: 'src', text: 'Source', state: { selected: true, checked: true } },
             { id: 'dest', text: 'Destination' },
           ],
+          check_callback: true,
         },
         plugins: ['checkbox'],
       });

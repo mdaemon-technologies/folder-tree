@@ -53,7 +53,8 @@ describe('Lifecycle Events', () => {
   });
 
   test('before_open event fires before open_node', () => {
-    tree = new MDFolderTree(container, { core: { data: sampleData } });
+    tree = new MDFolderTree(container, { core: { data: sampleData, animation: 0 } });
+    // jstree animates by default, firing after_* once the slide ends; 0 fires them at once.
     const order: string[] = [];
     container.addEventListener('before_open.MDFolderTree', () => order.push('before_open'));
     container.addEventListener('open_node.MDFolderTree', () => order.push('open_node'));
@@ -63,7 +64,8 @@ describe('Lifecycle Events', () => {
   });
 
   test('after_close event fires after close_node', () => {
-    tree = new MDFolderTree(container, { core: { data: sampleData } });
+    tree = new MDFolderTree(container, { core: { data: sampleData, animation: 0 } });
+    // jstree animates by default, firing after_* once the slide ends; 0 fires them at once.
     tree.open_node('folder');
     const order: string[] = [];
     container.addEventListener('close_node.MDFolderTree', () => order.push('close_node'));
@@ -96,6 +98,8 @@ describe('Lifecycle Events', () => {
     const handler = jest.fn();
     container.addEventListener('dehover_node.MDFolderTree', handler);
     const anchor = container.querySelector('#solo > .md-tree-anchor') as HTMLElement;
+    // As in jstree, only a hovered node can be dehovered, so hover it first.
+    anchor.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     anchor.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
     expect(handler).toHaveBeenCalled();
   });

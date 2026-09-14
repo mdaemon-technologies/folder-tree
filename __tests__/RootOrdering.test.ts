@@ -26,7 +26,7 @@ describe('Root ordering', () => {
     { id: 'c', text: 'C', children: [{ id: 'c1', text: 'C1' }] },
   ];
 
-  const build = () => new MDFolderTree(container, { core: { data } });
+  const build = () => new MDFolderTree(container, { core: { data, check_callback: true } });
   const domOrder = () =>
     Array.from(container.querySelectorAll('.md-tree-container-ul > .md-tree-node')).map((el) => el.id);
 
@@ -161,7 +161,7 @@ describe('Root ordering — copyNode', () => {
   ];
 
   it('should place a copy made at the root into the root order', () => {
-    const tree = new MDFolderTree(container, { core: { data } });
+    const tree = new MDFolderTree(container, { core: { data, check_callback: true } });
 
     const newId = tree.copyNode('a', '#', 0) as string;
 
@@ -170,7 +170,7 @@ describe('Root ordering — copyNode', () => {
   });
 
   it('should render a copy made at the root', () => {
-    const tree = new MDFolderTree(container, { core: { data } });
+    const tree = new MDFolderTree(container, { core: { data, check_callback: true } });
 
     const newId = tree.copyNode('a', '#', 1) as string;
 

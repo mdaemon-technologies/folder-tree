@@ -5,6 +5,8 @@ describe('TypesPlugin', () => {
   it('should resolve icon class from type config', () => {
     const plugin = new TypesPlugin();
     plugin.init({
+      on: () => undefined,
+      get_node: () => false,
       config: {
         types: {
           default: { icon: 'md-tree-icon-folder' },
@@ -20,6 +22,8 @@ describe('TypesPlugin', () => {
   it('should fall back to default type', () => {
     const plugin = new TypesPlugin();
     plugin.init({
+      on: () => undefined,
+      get_node: () => false,
       config: {
         types: {
           default: { icon: 'md-tree-icon-folder' },
@@ -33,6 +37,8 @@ describe('TypesPlugin', () => {
   it('should return false when icon is false', () => {
     const plugin = new TypesPlugin();
     plugin.init({
+      on: () => undefined,
+      get_node: () => false,
       config: {
         types: {
           hidden: { icon: false },
@@ -41,6 +47,24 @@ describe('TypesPlugin', () => {
     } as any);
 
     expect(plugin.getIconForType('hidden')).toBe(false);
+  });
+
+  it('should fill unset properties from default, except for the root type, as jstree does', () => {
+    const plugin = new TypesPlugin();
+    plugin.init({
+      on: () => undefined,
+      get_node: () => false,
+      config: {
+        types: {
+          '#': { max_children: 1 },
+          default: { icon: 'def', max_depth: 3 },
+          file: { icon: 'file' },
+        },
+      },
+    } as any);
+
+    expect(plugin.rules('file')).toEqual({ icon: 'file', max_depth: 3 });
+    expect(plugin.rules('#')).toEqual({ max_children: 1 });
   });
 
   describe('icon precedence', () => {

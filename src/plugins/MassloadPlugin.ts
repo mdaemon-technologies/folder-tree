@@ -1,106 +1,70 @@
-import type { TreePlugin, TreePluginHost, MassloadConfig } from '../types';
+import type { MDFolderTree } from '../MDFolderTree';
+import type { TreeNodeData, TreePlugin, TreePluginHost } from '../types';
+import { isAjaxConfig, sendAjax } from '../ajax';
 
 /**
- * MassloadPlugin - batches multiple lazy-load requests into a single request.
- * Mirrors jstree's "massload" plugin.
- *
- * When multiple nodes need to be loaded (e.g., after restoring state), this plugin
- * collects all pending node IDs and fires a single request instead of one per node.
- *
- * Config: `massload: { url, data, callback }`
+ * Massload plugin, as jstree's. `massload(ids, callback)` — called with the
+ * tree as `this` — fetches the children of several nodes in one call,
+ * answering with a map of id to children (JSON, or an HTML string). The tree
+ * asks it whenever it loads several nodes together — load_node with an array,
+ * refresh_node, load_all — and each node then loads from the answer, or
+ * through core.data when the answer leaves it out. A single load_node goes
+ * straight to core.data, as in jstree.
  */
 export class MassloadPlugin implements TreePlugin {
   readonly name = 'massload';
   private tree!: TreePluginHost;
-  private pending: Set<string> = new Set();
-  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private answers = new Map<string, TreeNodeData[] | string>();
 
   init(tree: TreePluginHost): void {
     this.tree = tree;
   }
 
   destroy(): void {
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
-    }
-    this.pending.clear();
+    this.answers.clear();
   }
 
   /**
-   * Queue a node for batch loading. Call this instead of individual load_node requests.
+   * Fetch `ids` in one call — through the massload function, or its ajax
+   * config (`url` / `data` may be functions of the ids) — then `proceed`; at
+   * once without massload or ids, and without answers if the request fails.
    */
-  queueLoad(nodeId: string): void {
-    this.pending.add(nodeId);
-    this.scheduleBatch();
-  }
-
-  /**
-   * Queue multiple nodes for batch loading.
-   */
-  queueLoadMultiple(nodeIds: string[]): void {
-    for (const id of nodeIds) {
-      this.pending.add(id);
+  prefetch(ids: string[], proceed: () => void): void {
+    const massload = this.tree.config.massload;
+    this.answers.clear();
+    if (ids.length === 0 || !massload) {
+      proceed();
+      return;
     }
-    this.scheduleBatch();
-  }
-
-  private scheduleBatch(): void {
-    if (this.debounceTimer) return;
-    this.debounceTimer = setTimeout(() => {
-      this.debounceTimer = null;
-      this.executeBatch();
-    }, 0);
-  }
-
-  private async executeBatch(): Promise<void> {
-    if (this.pending.size === 0) return;
-
-    const nodeIds = Array.from(this.pending);
-    this.pending.clear();
-
-    const config = this.getConfig();
-
-    try {
-      let response: unknown;
-
-      if (config.url) {
-        const body = config.data ? config.data(nodeIds) : { ids: nodeIds };
-        const res = await fetch(config.url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        response = await res.json();
-      }
-
-      if (config.callback && response !== undefined) {
-        const nodeDataMap = config.callback(nodeIds, response);
-        // Distribute loaded data to each node's children
-        for (const [nodeId, children] of Object.entries(nodeDataMap)) {
-          const node = this.tree.getNode(nodeId);
-          if (node) {
-            node.state.loaded = true;
-            node.state.loading = false;
-            for (const childData of children) {
-              this.tree.createNode(nodeId, childData);
-            }
-          }
-        }
-        this.tree.redraw();
-      }
-    } catch {
-      // Mark nodes as not loading on failure
-      for (const id of nodeIds) {
-        const node = this.tree.getNode(id);
-        if (node) {
-          node.state.loading = false;
+    const tree = this.tree as unknown as MDFolderTree;
+    const store = (data: unknown): void => {
+      if (data && typeof data === 'object') {
+        for (const [id, children] of Object.entries(data)) {
+          this.answers.set(id, children as TreeNodeData[] | string);
         }
       }
+      proceed();
+    };
+    if (typeof massload === 'function') {
+      massload.call(tree, ids, store);
+      return;
     }
+    if (isAjaxConfig(massload)) {
+      const url = typeof massload.url === 'function' ? massload.url.call(tree, ids) : massload.url;
+      const data =
+        typeof massload.data === 'function'
+          ? (massload.data as (this: MDFolderTree, ids: string[]) => unknown).call(tree, ids)
+          : massload.data;
+      sendAjax(massload, url, data, { success: store, fail: () => proceed() });
+      return;
+    }
+    proceed();
   }
 
-  private getConfig(): MassloadConfig {
-    return this.tree.config.massload ?? {};
+  /** The prefetched children of `id`, handed out once. */
+  take(id: string): TreeNodeData[] | string | undefined {
+    const answer = this.answers.get(id);
+    this.answers.delete(id);
+    return answer;
   }
 }

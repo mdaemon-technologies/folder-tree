@@ -11,11 +11,14 @@ describe('TreeSelection', () => {
     expect(sel.getSelected()).toEqual(['b']);
   });
 
-  it('should enforce single-select mode', () => {
+  it('should not enforce single-select mode itself', () => {
+    // `core.multiple` is an interaction constraint enforced by
+    // MDFolderTree.activate_node, as in jstree. The set applies no policy;
+    // the constructor argument is retained only for compatibility.
     const sel = new TreeSelection(false);
     sel.select('a');
     sel.select('b');
-    expect(sel.getSelected()).toEqual(['b']);
+    expect(sel.getSelected()).toEqual(['a', 'b']);
   });
 
   it('should select all', () => {

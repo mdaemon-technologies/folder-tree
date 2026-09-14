@@ -1,69 +1,45 @@
 import { MassloadPlugin } from '../../src/plugins/MassloadPlugin';
 import { MDFolderTree } from '../../src/MDFolderTree';
-import type { TreeNodeData } from '../../src/types';
 
+// The massload plugin as jstree's. Its end-to-end behavior is covered by
+// MassloadParity.test.ts; these check the answer cache.
 describe('MassloadPlugin', () => {
   describe('unit tests', () => {
-    it('should batch multiple load requests', () => {
+    const host = (massload: unknown) => ({ config: { massload } }) as any;
+    const answering = (data: Record<string, unknown>) =>
+      host((_ids: string[], callback: (d: unknown) => void) => callback(data));
+
+    it('should hand each prefetched answer out once', () => {
       const plugin = new MassloadPlugin();
-      plugin.init({
-        config: { massload: {} },
-        getNode: () => null,
-        redraw: jest.fn(),
-        createNode: jest.fn(),
-      } as any);
+      plugin.init(answering({ a: [{ id: 'x', text: 'X' }] }));
+      const proceed = jest.fn();
 
-      plugin.queueLoad('node-1');
-      plugin.queueLoad('node-2');
-      plugin.queueLoad('node-3');
+      plugin.prefetch(['a'], proceed);
 
-      // Pending should have 3 nodes (internal state)
-      expect((plugin as any).pending.size).toBe(3);
+      expect(proceed).toHaveBeenCalledTimes(1);
+      expect(plugin.take('a')).toEqual([{ id: 'x', text: 'X' }]);
+      expect(plugin.take('a')).toBeUndefined();
     });
 
-    it('should deduplicate queued node IDs', () => {
+    it('should proceed at once without a massload function', () => {
       const plugin = new MassloadPlugin();
-      plugin.init({
-        config: { massload: {} },
-        getNode: () => null,
-        redraw: jest.fn(),
-        createNode: jest.fn(),
-      } as any);
+      plugin.init(host(null));
+      const proceed = jest.fn();
 
-      plugin.queueLoad('node-1');
-      plugin.queueLoad('node-1');
-      plugin.queueLoad('node-1');
+      plugin.prefetch(['a'], proceed);
 
-      expect((plugin as any).pending.size).toBe(1);
-    });
-
-    it('should accept multiple node IDs at once', () => {
-      const plugin = new MassloadPlugin();
-      plugin.init({
-        config: { massload: {} },
-        getNode: () => null,
-        redraw: jest.fn(),
-        createNode: jest.fn(),
-      } as any);
-
-      plugin.queueLoadMultiple(['a', 'b', 'c']);
-      expect((plugin as any).pending.size).toBe(3);
+      expect(proceed).toHaveBeenCalledTimes(1);
+      expect(plugin.take('a')).toBeUndefined();
     });
 
     it('should clean up on destroy', () => {
       const plugin = new MassloadPlugin();
-      plugin.init({
-        config: { massload: {} },
-        getNode: () => null,
-        redraw: jest.fn(),
-        createNode: jest.fn(),
-      } as any);
+      plugin.init(answering({ a: [] }));
+      plugin.prefetch(['a'], () => undefined);
 
-      plugin.queueLoad('x');
       plugin.destroy();
 
-      expect((plugin as any).pending.size).toBe(0);
-      expect((plugin as any).debounceTimer).toBeNull();
+      expect(plugin.take('a')).toBeUndefined();
     });
   });
 
@@ -85,11 +61,7 @@ describe('MassloadPlugin', () => {
       const tree = new MDFolderTree(container, {
         core: { data: [{ id: 'root', text: 'Root' }] },
         plugins: ['massload'],
-        massload: {
-          url: '/api/nodes',
-          data: (ids) => ({ ids }),
-          callback: (ids, response) => ({}),
-        },
+        massload: (_ids, callback) => callback({}),
       });
 
       expect(tree).toBeDefined();

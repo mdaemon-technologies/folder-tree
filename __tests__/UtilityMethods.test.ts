@@ -70,8 +70,8 @@ describe('Additional Utility Methods', () => {
       errTree.move_node('child-1', 'solo', 0);
       const err = errTree.last_error() as any;
       expect(err).not.toBeNull();
-      expect(err.error).toBe('check_callback');
-      expect(err.operation).toBe('move_node');
+      expect(err).toMatchObject({ error: 'check', plugin: 'core', id: 'core_03' });
+      expect(JSON.parse(err.data).chk).toBe('move_node');
       errTree.destroy();
     });
 
@@ -84,7 +84,7 @@ describe('Additional Utility Methods', () => {
       });
       errTree.delete_node('child-1');
       expect(errorCb).toHaveBeenCalled();
-      expect(errorCb.mock.calls[0][0].operation).toBe('delete_node');
+      expect(JSON.parse(errorCb.mock.calls[0][0].data).chk).toBe('delete_node');
       errTree.destroy();
       document.body.removeChild(div);
     });

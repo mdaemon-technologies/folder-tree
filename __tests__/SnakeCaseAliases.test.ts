@@ -35,7 +35,8 @@ describe('Snake_case CRUD Aliases', () => {
 
   test('move_node moves a node to another parent', () => {
     const result = tree.move_node('child-1', 'other', 0);
-    expect(result).toBe(true);
+    // As in jstree, move_node returns the moved node's id.
+    expect(result).toBe('child-1');
     const node = tree.get_node('child-1');
     expect(node).not.toBeNull();
     if (node && 'parent' in node) {
@@ -64,6 +65,6 @@ describe('Snake_case CRUD Aliases', () => {
   test('delete_node deletes a node', () => {
     const result = tree.delete_node('child-2');
     expect(result).toBe(true);
-    expect(tree.get_node('child-2')).toBeNull();
+    expect(tree.get_node('child-2')).toBe(false);
   });
 });

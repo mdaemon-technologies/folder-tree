@@ -291,10 +291,16 @@ describe('Lazy loading regression tests', () => {
         plugins: ['checkbox'],
       });
 
-      tree.select_node('n1');
+      // Single-select is enforced on activation, as in jstree; programmatic
+      // select_node applies no policy and would keep both nodes selected.
+      const click = (id: string, init: MouseEventInit = {}) =>
+        (container.querySelector(`#${id} > .md-tree-anchor`) as HTMLElement)
+          .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init }));
+
+      click('n1');
       expect(tree.get_node('n1')!.state.checked).toBe(true);
 
-      tree.select_node('n2');
+      click('n2');
       expect(tree.get_node('n1')!.state.checked).toBe(false);
       expect(tree.get_node('n2')!.state.checked).toBe(true);
     });

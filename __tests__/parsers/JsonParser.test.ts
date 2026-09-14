@@ -39,15 +39,16 @@ describe('JsonParser', () => {
     expect(result[0].id).toMatch(/^mdft_/);
   });
 
-  it('should normalize state defaults', () => {
+  // The model layers the defaults, data.jstree and a node's own state in
+  // jstree's order, so the parser must not invent state the node lacks.
+  it('should pass state through as given, leaving the defaults to the model', () => {
     const parser = new JsonParser();
-    const result = parser.parse([{ id: 'x', text: 'X' }]);
+    const result = parser.parse([
+      { id: 'x', text: 'X' },
+      { id: 'y', text: 'Y', state: { opened: true } },
+    ]);
 
-    expect(result[0].state).toEqual({
-      opened: false,
-      selected: false,
-      disabled: false,
-      checked: false,
-    });
+    expect(result[0].state).toEqual({});
+    expect(result[1].state).toEqual({ opened: true });
   });
 });

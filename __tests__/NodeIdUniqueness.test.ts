@@ -65,13 +65,13 @@ describe('Node id uniqueness', () => {
     ];
 
     it('should refuse to create a node with an existing id', () => {
-      const tree = new MDFolderTree(container, { core: { data: base } });
+      const tree = new MDFolderTree(container, { core: { data: base, check_callback: true } });
 
       expect(tree.createNode('b', { id: 'a', text: 'Hijacked' })).toBe(false);
     });
 
     it('should leave the existing node intact when a duplicate create is refused', () => {
-      const tree = new MDFolderTree(container, { core: { data: base } });
+      const tree = new MDFolderTree(container, { core: { data: base, check_callback: true } });
 
       tree.createNode('b', { id: 'a', text: 'Hijacked' });
 
@@ -83,7 +83,7 @@ describe('Node id uniqueness', () => {
 
     it('should report an error when refusing a duplicate create', () => {
       const errors: unknown[] = [];
-      const tree = new MDFolderTree(container, { core: { data: base, error: (e) => errors.push(e) } });
+      const tree = new MDFolderTree(container, { core: { data: base, check_callback: true, error: (e) => errors.push(e) } });
 
       tree.createNode('b', { id: 'a', text: 'Hijacked' });
 
@@ -94,7 +94,7 @@ describe('Node id uniqueness', () => {
     });
 
     it('should generate distinct ids for successive nodes created without one', () => {
-      const tree = new MDFolderTree(container, { core: { data: base } });
+      const tree = new MDFolderTree(container, { core: { data: base, check_callback: true } });
 
       const first = tree.createNode('b', { text: 'First' } as TreeNodeData);
       const second = tree.createNode('b', { text: 'Second' } as TreeNodeData);
@@ -106,7 +106,7 @@ describe('Node id uniqueness', () => {
     });
 
     it('should not generate an id that collides with an existing node', () => {
-      const tree = new MDFolderTree(container, { core: { data: base } });
+      const tree = new MDFolderTree(container, { core: { data: base, check_callback: true } });
 
       // Occupy the id the generator would otherwise mint first.
       tree.createNode('b', { id: 'new_1', text: 'Squatter' });
@@ -121,7 +121,7 @@ describe('Node id uniqueness', () => {
   describe('copyNode', () => {
     it('should generate distinct ids for successive copies of the same node', () => {
       const tree = new MDFolderTree(container, {
-        core: { data: [{ id: 'src', text: 'Source' }, { id: 'dest', text: 'Dest' }] },
+        core: { data: [{ id: 'src', text: 'Source' }, { id: 'dest', text: 'Dest' }], check_callback: true },
       });
 
       const first = tree.copyNode('src', 'dest', 0);

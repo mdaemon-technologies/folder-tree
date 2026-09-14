@@ -321,7 +321,14 @@ describe('MDFolderTree - Core Operations', () => {
       });
 
       tree.moveNode('file-a', 'folder-2', 0);
-      expect(checkFn).toHaveBeenCalledWith('move_node', expect.anything(), expect.anything(), 0, {});
+      // jstree passes core metadata as `more` for a same-tree move.
+      expect(checkFn).toHaveBeenCalledWith(
+        'move_node',
+        expect.anything(),
+        expect.anything(),
+        0,
+        expect.objectContaining({ core: true, is_multi: false, is_foreign: false }),
+      );
     });
 
     it('should block operation when check_callback returns false', () => {

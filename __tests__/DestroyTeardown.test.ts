@@ -107,7 +107,8 @@ describe('destroy() teardown', () => {
 
       tree.destroy();
 
-      expect(tree.get_buffer()).toBeNull();
+      // jstree reports an empty buffer with its fields false, not null.
+      expect(tree.get_buffer().mode).toBe(false);
       expect(tree.can_paste()).toBe(false);
     });
 

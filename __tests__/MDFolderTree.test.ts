@@ -149,9 +149,15 @@ describe('MDFolderTree', () => {
     const tree = new MDFolderTree(container, {
       core: { data: sampleData, multiple: false },
     });
+    // As in jstree, `multiple` constrains interaction rather than the
+    // programmatic API, so it is exercised through clicks. The ctrl modifier
+    // would add to the selection in multi-select mode; here it must not.
+    const click = (id: string, init: MouseEventInit = {}) =>
+      (container.querySelector(`#${id} > .md-tree-anchor`) as HTMLElement)
+        .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init }));
 
-    tree.select_node('node-1');
-    tree.select_node('node-2');
+    click('node-1', { ctrlKey: true });
+    click('node-2', { ctrlKey: true });
 
     expect(tree.get_selected()).toEqual(['node-2']);
   });
