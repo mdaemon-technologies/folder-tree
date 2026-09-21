@@ -1,6 +1,6 @@
 {
   "name": "@mdaemon/folder-tree",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "A zero-dependency TypeScript tree view component — drop-in jstree replacement, no jQuery required",
   "homepage": "https://github.com/mdaemon-technologies/folder-tree",
   "repository": {
@@ -65,6 +65,9 @@
     "url": "https://www.mdaemon.com"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",

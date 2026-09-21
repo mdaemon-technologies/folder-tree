@@ -1,14 +1,12 @@
 # @mdaemon/folder-tree
 
-A zero-dependency TypeScript tree view component — drop-in replacement for [jstree](https://www.jstree.com/).
-
-[![npm version](https://img.shields.io/npm/v/@mdaemon/folder-tree.svg)](https://www.npmjs.com/package/@mdaemon/folder-tree)
+[![npm](https://img.shields.io/npm/v/@mdaemon/folder-tree?color=blue)](https://www.npmjs.com/package/@mdaemon/folder-tree)
+[![license](https://img.shields.io/npm/l/@mdaemon/folder-tree?color=green)](LICENSE)
+[![node](https://img.shields.io/node/v/@mdaemon/folder-tree)](https://nodejs.org)
+[![install size](https://packagephobia.com/badge?p=@mdaemon/folder-tree)](https://packagephobia.com/result?p=@mdaemon/folder-tree)
 [![CI](https://github.com/mdaemon-technologies/folder-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/mdaemon-technologies/folder-tree/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Acknowledgments
-
-This library is a TypeScript port of [jstree](https://www.jstree.com/), created by [Ivan Bozhanov (vakata)](https://github.com/vakata). MDaemon Technologies relied on jstree for over a decade and owes a great deal to Ivan's work — his library set the standard for tree view components on the web. As we moved away from jQuery, we chose to port jstree's proven architecture to modern TypeScript with native DOM events rather than reinvent the wheel. Thank you, Ivan, for building and maintaining such an excellent open-source project.
+A zero-dependency TypeScript tree view component — drop-in jstree replacement, no jQuery required
 
 ## Features
 
@@ -20,7 +18,7 @@ This library is a TypeScript port of [jstree](https://www.jstree.com/), created 
 - **Multiple output formats** — ESM, CJS, and UMD bundles
 - **Full TypeScript types** included
 
-## Installation
+## Install
 
 ```bash
 npm install @mdaemon/folder-tree
@@ -28,7 +26,7 @@ npm install @mdaemon/folder-tree
 
 ## Usage
 
-### ESM / TypeScript
+### ES modules
 
 ```ts
 import { MDFolderTree } from '@mdaemon/folder-tree';
@@ -59,7 +57,7 @@ document.getElementById('tree')!.addEventListener('changed.MDFolderTree', (e) =>
 });
 ```
 
-### UMD (Script Tag — jstree Drop-in)
+### Browser (UMD)
 
 ```html
 <script src="node_modules/@mdaemon/folder-tree/dist/MDFolderTree.umd.js"></script>
@@ -293,6 +291,18 @@ npm run typecheck    # TypeScript check
 npm run lint         # ESLint
 ```
 
+## Acknowledgments
+
+This library is a TypeScript port of [jstree](https://www.jstree.com/), created by [Ivan Bozhanov (vakata)](https://github.com/vakata). MDaemon Technologies relied on jstree for over a decade and owes a great deal to Ivan's work — his library set the standard for tree view components on the web. As we moved away from jQuery, we chose to port jstree's proven architecture to modern TypeScript with native DOM events rather than reinvent the wheel. Thank you, Ivan, for building and maintaining such an excellent open-source project.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
-[MIT](LICENSE) — Copyright (c) MDaemon Technologies, Ltd.
+Published under the [MIT](LICENSE) license.
+
+Published by **MDaemon Technologies, Ltd.**  
+Simple Secure Email  
+[https://www.mdaemon.com](https://www.mdaemon.com)
