@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/@mdaemon/folder-tree?color=blue)](https://www.npmjs.com/package/@mdaemon/folder-tree)
 [![license](https://img.shields.io/npm/l/@mdaemon/folder-tree?color=green)](LICENSE)
 [![node](https://img.shields.io/node/v/@mdaemon/folder-tree)](https://nodejs.org)
-[![install size](https://packagephobia.com/badge?p=@mdaemon/folder-tree)](https://packagephobia.com/result?p=@mdaemon/folder-tree)
+[![install size](https://img.shields.io/npm/unpacked-size/@mdaemon/folder-tree)](https://packagephobia.com/result?p=@mdaemon/folder-tree)
 [![CI](https://github.com/mdaemon-technologies/folder-tree/actions/workflows/ci.yml/badge.svg)](https://github.com/mdaemon-technologies/folder-tree/actions/workflows/ci.yml)
 
 A zero-dependency TypeScript tree view component — drop-in jstree replacement, no jQuery required
