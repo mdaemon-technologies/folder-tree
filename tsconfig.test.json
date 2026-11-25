@@ -1,10 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node", "jest"],
+    "types": ["node", "vitest/globals"],
     "esModuleInterop": true,
-    "noEmit": true,
-    "ignoreDeprecations": "6.0"
+    // The base config's rootDir is ./src; the tests live beside it.
+    "rootDir": "."
   },
-  "include": ["src", "__tests__"]
+  "include": ["src", "__tests__"],
+  // Replaces the base config's exclude, which lists __tests__: inherited, it
+  // would leave every test out of `npm run typecheck`.
+  "exclude": ["node_modules", "dist"]
 }

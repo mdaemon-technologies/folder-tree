@@ -2,6 +2,7 @@ import type {
   TreeConfig,
   TreeNode,
   TreeNodeData,
+  NewNodeData,
   TreePlugin,
   TreePluginHost,
   EventHandler,
@@ -758,10 +759,11 @@ export class MDFolderTree implements TreePluginHost {
    * text) or omitted, and its text defaults to `get_string('New node')`.
    * `pos` defaults to 'last' (see `resolveInsertion` for the other forms). An
    * unloaded parent is loaded first, unless `is_loaded` says it already is.
+   * Any field of `node` may be left out: its id is generated, as in jstree.
    */
   create_node(
     par: NodeRef | null,
-    node?: TreeNodeData | string,
+    node?: NewNodeData | string,
     pos: number | string = 'last',
     callback?: (node: TreeNode) => void,
     isLoaded = false,
@@ -774,7 +776,7 @@ export class MDFolderTree implements TreePluginHost {
       });
     }
 
-    const data = (typeof node === 'string' ? { text: node } : { ...node }) as TreeNodeData;
+    const data: NewNodeData = typeof node === 'string' ? { text: node } : { ...node };
     if (data.text === undefined) data.text = this.newNodeName(target);
     const { parent, index } = this.resolveInsertion(target, pos);
     const created = this.createNode(parent.id, data, index);
@@ -1510,7 +1512,7 @@ export class MDFolderTree implements TreePluginHost {
     return true;
   }
 
-  createNode(parentId: string, data: TreeNodeData, position?: number): TreeNode | false {
+  createNode(parentId: string, data: NewNodeData, position?: number): TreeNode | false {
     const parent = this.resolveParent(parentId);
     if (!parent) return false;
 
@@ -1536,7 +1538,7 @@ export class MDFolderTree implements TreePluginHost {
    * a whole subtree through the same normalization as a load. As in jstree,
    * the node goes under `parent` whatever `parent` it names itself.
    */
-  private buildAt(parent: TreeNode, data: TreeNodeData, position?: number): TreeNode {
+  private buildAt(parent: TreeNode, data: NewNodeData, position?: number): TreeNode {
     const copy = { ...this.cloneData(data), id: data.id || this.mintId('new') } as TreeNodeData;
     delete copy.parent;
     this.buildNodeTree([copy], parent.id);
@@ -2323,14 +2325,14 @@ export class MDFolderTree implements TreePluginHost {
    * JSON nodes as jstree's `_append_json_data` takes them: a `{ d }` wrapper
    * (as ASP.NET sends) unwrapped, and a single node wrapped in an array.
    */
-  private asNodeList(payload: unknown): TreeNodeData[] {
+  private asNodeList(payload: unknown): NewNodeData[] {
     let data = payload;
     if (data && typeof data === 'object' && (data as { d?: unknown }).d) {
       data = (data as { d: unknown }).d;
       if (typeof data === 'string') data = JSON.parse(data);
     }
     if (data === null || data === undefined) return [];
-    return (Array.isArray(data) ? data : [data]) as TreeNodeData[];
+    return (Array.isArray(data) ? data : [data]) as NewNodeData[];
   }
 
   /**
@@ -2338,7 +2340,7 @@ export class MDFolderTree implements TreePluginHost {
    * (JSON, through the worker when there is one) or `_append_html_data`
    * (parsed markup, here and now), then `done`.
    */
-  private appendChildren(node: TreeNode, data: TreeNodeData[], done: () => void, json = true): void {
+  private appendChildren(node: TreeNode, data: NewNodeData[], done: () => void, json = true): void {
     for (const cid of [...node.children]) this.removeSubtree(cid);
     node.children = [];
     node.children_d = [];
@@ -2362,7 +2364,7 @@ export class MDFolderTree implements TreePluginHost {
    * workers exist, one load at a time, falling back to this thread when the
    * worker fails or the data cannot be sent to it — then `done`.
    */
-  private ingest(data: TreeNodeData[], parentId: string, done: () => void): void {
+  private ingest(data: NewNodeData[], parentId: string, done: () => void): void {
     const workers =
       this.config.core?.worker !== false &&
       typeof Worker !== 'undefined' &&
@@ -2733,7 +2735,7 @@ export class MDFolderTree implements TreePluginHost {
    * references are handled by the same code: a node's parent is whatever its
    * `parent` property says, defaulting to the enclosing `parentId`.
    */
-  private buildNodeTree(data: TreeNodeData[], parentId: string): void {
+  private buildNodeTree(data: NewNodeData[], parentId: string): void {
     this.applyModel(
       buildModel({ data, parent: parentId, existing: this.store, counter: this.idCounter, prefix: 'mdft' }),
     );
@@ -3195,10 +3197,10 @@ export class MDFolderTree implements TreePluginHost {
    * operation names to booleans. A refusal is recorded in `last_error()` in
    * jstree's shape and handed to `core.error`.
    */
-  check(chk: string, obj: NodeRef, par: NodeRef, pos?: number | string, more?: CheckMore): boolean {
+  check(chk: string, obj: NodeRef | NewNodeData, par: NodeRef, pos?: number | string, more?: CheckMore): boolean {
     // As in jstree, an object already carrying an id is used as-is; for
     // create_node it is the new node's data, which is not in the tree yet.
-    const node = (chk === 'create_node' || more?.is_multi ? obj : this.resolveNode(obj)) as TreeNode | null;
+    const node = (chk === 'create_node' || more?.is_multi ? obj : this.resolveNode(obj as NodeRef)) as TreeNode | null;
     const parent = this.resolveNode(par);
 
     const refuse = (code: string, reason: string, plugin = 'core'): false => {

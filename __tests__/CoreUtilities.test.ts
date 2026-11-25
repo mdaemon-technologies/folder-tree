@@ -80,7 +80,7 @@ describe('Core Utility Methods', () => {
   });
 
   test('set_text changes node text and emits event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('set_text.MDFolderTree', handler);
     expect(tree.set_text('root-1', 'New Name')).toBe(true);
     expect(tree.get_text('root-1')).toBe('New Name');
@@ -188,7 +188,7 @@ describe('Core Utility Methods', () => {
   test('set_id changes a node ID', () => {
     expect(tree.set_id('root-2', 'renamed-root')).toBe(true);
     expect(tree.get_node('root-2')).toBe(false);
-    expect(tree.get_node('renamed-root')).not.toBeNull();
+    expect(tree.get_node('renamed-root')).not.toBe(false);
     expect(tree.get_text('renamed-root')).toBe('Root Two');
   });
 
@@ -223,11 +223,14 @@ describe('Core Utility Methods', () => {
   });
 
   describe('get_json flat mode', () => {
-    it('should not nest children when flat is requested', () => {
-      const tree = new MDFolderTree(container, {
+    beforeEach(() => {
+      tree.destroy();
+      tree = new MDFolderTree(container, {
         core: { data: [{ id: 'p', text: 'P', children: [{ id: 'k', text: 'K' }] }] },
       });
+    });
 
+    it('should not nest children when flat is requested', () => {
       const flat = tree.get_json(undefined, { flat: true }) as TreeNodeData[];
 
       expect(flat.map((n) => n.id)).toEqual(['p', 'k']);
@@ -235,10 +238,6 @@ describe('Core Utility Methods', () => {
     });
 
     it('should still nest children in the default tree form', () => {
-      const tree = new MDFolderTree(container, {
-        core: { data: [{ id: 'p', text: 'P', children: [{ id: 'k', text: 'K' }] }] },
-      });
-
       const nested = tree.get_json() as TreeNodeData[];
 
       expect(nested).toHaveLength(1);

@@ -1,9 +1,9 @@
-import type { TreeNode, TreeNodeData } from './types';
+import type { NewNodeData, TreeNode, TreeNodeData } from './types';
 
 /** What `buildModel` works from. */
 export interface ModelInput {
-  /** The nodes to build, nested or flat (with `parent`). */
-  data: TreeNodeData[];
+  /** The nodes to build, nested or flat (with `parent`); ids may be left out. */
+  data: NewNodeData[];
   /** The parent the top level of `data` goes under. */
   parent: string;
   /**
@@ -57,7 +57,7 @@ export function buildModel(input: ModelInput): ModelOutput {
   // Ids named in the payload are reserved up front: they are not in the tree
   // yet, so generated ids could otherwise collide with them.
   const taken = new Set<string>();
-  const reserve = (list: TreeNodeData[]): void => {
+  const reserve = (list: NewNodeData[]): void => {
     for (const raw of list) {
       const id = raw.id || raw.li_attr?.id;
       if (id) taken.add(id);
@@ -73,7 +73,7 @@ export function buildModel(input: ModelInput): ModelOutput {
     return candidate;
   };
 
-  const normalize = (raw: TreeNodeData): TreeNodeData => {
+  const normalize = (raw: NewNodeData): TreeNodeData => {
     const node: TreeNodeData = {
       // As in jstree, li_attr.id stands in for a missing id.
       id: raw.id || raw.li_attr?.id || nextId(),

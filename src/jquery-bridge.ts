@@ -29,7 +29,7 @@ function resolveElement(target: string | HTMLElement): HTMLElement | null {
  * Signatures:
  *  - `mdTree(target)` — create with defaults or return existing instance
  *  - `mdTree(target, config)` — create with config or return existing instance
- *  - `mdTree(target, true)` — return existing instance (or undefined)
+ *  - `mdTree(target, true)` — return existing instance (or null)
  *  - `mdTree(target, 'method', ...args)` — call a method on the instance
  */
 export function mdTree(

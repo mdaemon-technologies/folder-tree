@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
 import type { TreeNode, TreeNodeData } from '../src/types';
+import { stubLocalStorage } from './helpers/storage';
 
 /**
  * State parity with jstree 3.3.16.
@@ -23,23 +24,7 @@ describe('State parity', () => {
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
-    storage = {};
-    Object.defineProperty(window, 'localStorage', {
-      value: {
-        getItem: (key: string) => storage[key] ?? null,
-        setItem: (key: string, value: string) => {
-          storage[key] = value;
-        },
-        removeItem: (key: string) => {
-          delete storage[key];
-        },
-        clear: () => {
-          storage = {};
-        },
-      },
-      writable: true,
-      configurable: true,
-    });
+    storage = stubLocalStorage();
   });
 
   afterEach(() => {
@@ -146,8 +131,8 @@ describe('State parity', () => {
   });
 
   describe('state plugin', () => {
-    beforeEach(() => jest.useFakeTimers({ doNotFake: ['queueMicrotask'] }));
-    afterEach(() => jest.useRealTimers());
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
 
     const ready = () => Promise.resolve();
     const stateTree = (state: Record<string, unknown> = {}, core: Record<string, unknown> = {}) =>
@@ -159,7 +144,7 @@ describe('State parity', () => {
 
       tree.select_node('a1');
       expect(storage.jstree).toBeUndefined();
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
 
       const saved = JSON.parse(storage.jstree);
       expect(saved.state.core.selected).toEqual(['a1']);
@@ -171,14 +156,14 @@ describe('State parity', () => {
       const tree = stateTree({}, { loaded_state: true });
       await ready();
       tree.select_node('a1');
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       expect('loaded' in JSON.parse(storage.jstree).state.core).toBe(false);
       tree.destroy();
 
       const keeping = stateTree({ preserve_loaded: true }, { loaded_state: true });
       await ready();
       keeping.select_node('b1');
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       expect(JSON.parse(storage.jstree).state.core.loaded).toEqual(expect.arrayContaining(['A', 'B']));
     });
 

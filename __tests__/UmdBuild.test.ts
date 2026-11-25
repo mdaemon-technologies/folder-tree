@@ -76,9 +76,10 @@ describe('UMD entry point', () => {
     });
 
     it('should return the same API surface as direct construction', () => {
+      // mdTree is typed `unknown` (it also forwards method calls), so name the type here.
       const instance = mdTree(container, {
         core: { data: sampleData },
-      });
+      }) as MDFolderTree;
 
       // Verify key API methods are present
       expect(typeof instance.get_node).toBe('function');
@@ -97,10 +98,10 @@ describe('UMD entry point', () => {
       });
 
       tree.open_node('umd-1');
-      expect(tree.get_node('umd-1')!.state.opened).toBe(true);
+      expect(tree.getNode('umd-1')!.state.opened).toBe(true);
 
       tree.close_node('umd-1');
-      expect(tree.get_node('umd-1')!.state.opened).toBe(false);
+      expect(tree.getNode('umd-1')!.state.opened).toBe(false);
     });
 
     it('should select and deselect nodes', () => {
@@ -120,7 +121,7 @@ describe('UMD entry point', () => {
         core: { data: sampleData },
       });
 
-      const node = tree.get_node('umd-1');
+      const node = tree.getNode('umd-1');
       expect(node).toBeDefined();
       expect(node?.text).toBe('Folder A');
     });

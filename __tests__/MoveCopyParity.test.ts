@@ -108,7 +108,7 @@ describe('move_node / copy_node parity', () => {
 
     it('should call back with the node, the new parent and the position', () => {
       const tree = build();
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       tree.move_node('a', 'p', 'last', callback);
 
@@ -150,7 +150,7 @@ describe('move_node / copy_node parity', () => {
 
     it('should call back with the copy, the new parent and the position', () => {
       const tree = build();
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       const copy = tree.copy_node('a', 'p', 'first', callback) as string;
 

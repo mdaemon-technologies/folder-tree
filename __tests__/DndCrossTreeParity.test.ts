@@ -28,7 +28,7 @@ describe('dnd between trees and auto-scroll', () => {
     right.remove();
     document.elementFromPoint = realElementFromPoint;
     document.getElementById('vakata-dnd')?.remove();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   const leftData = (): TreeNodeData[] => [
@@ -156,34 +156,34 @@ describe('dnd between trees and auto-scroll', () => {
     };
 
     it('should scroll a scrollable ancestor near its edge, every 100ms', () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       const box = scroller();
       build(left, leftData());
       anchorIn(left, 'a').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0, button: 0 }));
 
       hover(anchorIn(left, 'b'), 95);
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       expect(box.scrollTop).toBe(10);
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       expect(box.scrollTop).toBe(20);
 
       document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
-      jest.advanceTimersByTime(300);
+      vi.advanceTimersByTime(300);
       expect(box.scrollTop).toBe(20);
       box.remove();
     });
 
     it('should emit dnd_scroll and forget the drop target when it scrolls', () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       const box = scroller();
       const tree = build(left, leftData());
-      const scrolled = jest.fn();
+      const scrolled = vi.fn();
       tree.on('dnd_scroll.MDFolderTree', scrolled);
       anchorIn(left, 'b').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0, button: 0 }));
       place(anchorIn(left, 'a'));
 
       hover(anchorIn(left, 'a'), 95);
-      jest.advanceTimersByTime(100);
+      vi.advanceTimersByTime(100);
       document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
 
       expect(scrolled).toHaveBeenCalled();

@@ -76,7 +76,7 @@ describe('Additional Utility Methods', () => {
     });
 
     test('core.error callback is invoked on failure', () => {
-      const errorCb = jest.fn();
+      const errorCb = vi.fn();
       const div = document.createElement('div');
       document.body.appendChild(div);
       const errTree = new MDFolderTree(div, {

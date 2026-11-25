@@ -115,14 +115,14 @@ describe('Theme Toggles', () => {
 
   // Events
   test('show_stripes emits event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('show_stripes.MDFolderTree', handler);
     tree.show_stripes();
     expect(handler).toHaveBeenCalled();
   });
 
   test('hide_dots emits event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('hide_dots.MDFolderTree', handler);
     tree.hide_dots();
     expect(handler).toHaveBeenCalled();

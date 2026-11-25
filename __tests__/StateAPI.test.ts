@@ -58,14 +58,14 @@ describe('State API (get_state / set_state)', () => {
   });
 
   test('set_state emits set_state event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('set_state.MDFolderTree', handler);
     tree.set_state({ core: { open: ['folder'], selected: [] } });
     expect(handler).toHaveBeenCalled();
   });
 
   test('set_state calls callback when provided', () => {
-    const cb = jest.fn();
+    const cb = vi.fn();
     tree.set_state({ core: { open: [], selected: [] } }, cb);
     expect(cb).toHaveBeenCalled();
   });

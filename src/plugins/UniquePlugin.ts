@@ -1,5 +1,5 @@
 import type { MDFolderTree } from '../MDFolderTree';
-import type { CheckMore, TreeNode, TreeNodeData, TreePlugin, TreePluginHost, UniqueConfig } from '../types';
+import type { CheckMore, NewNodeData, TreeNode, TreePlugin, TreePluginHost, UniqueConfig } from '../types';
 
 /**
  * Unique plugin, as jstree's. It joins `check` to refuse a name a sibling
@@ -25,7 +25,7 @@ export class UniquePlugin implements TreePlugin {
   /** jstree's unique `check`. */
   onCheck(
     chk: string,
-    node: TreeNode | TreeNodeData | null,
+    node: TreeNode | NewNodeData | null,
     parent: TreeNode | null,
     pos: unknown,
     more: CheckMore,

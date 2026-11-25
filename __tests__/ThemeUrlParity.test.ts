@@ -68,7 +68,7 @@ describe('theme url parity', () => {
 
   it('should still swap the theme classes and emit set_theme', () => {
     const tree = new MDFolderTree(container, { core: { data: data() } });
-    const themed = jest.fn();
+    const themed = vi.fn();
     tree.on('set_theme.MDFolderTree', (e) => themed((e as CustomEvent).detail));
 
     tree.set_theme('six', '/css/six.css');

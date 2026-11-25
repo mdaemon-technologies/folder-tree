@@ -48,7 +48,7 @@ describe('dnd.use_html5 parity', () => {
   };
   const fire = (target: EventTarget, type: string, init: MouseEventInit = {}) => {
     const event = new MouseEvent(type, { bubbles: true, cancelable: true, ...init });
-    const dataTransfer = { dropEffect: 'none', effectAllowed: 'all', setData: jest.fn(), getData: () => '' };
+    const dataTransfer = { dropEffect: 'none', effectAllowed: 'all', setData: vi.fn(), getData: () => '' };
     Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
     target.dispatchEvent(event);
     return { event, dataTransfer };
@@ -101,7 +101,7 @@ describe('dnd.use_html5 parity', () => {
   describe('starting a drag', () => {
     it('should start on dragstart with jstree\'s payload and no helper', () => {
       const tree = build(left);
-      const start = jest.fn();
+      const start = vi.fn();
       tree.on('dnd_start.MDFolderTree', (e) => start((e as CustomEvent).detail));
 
       fire(anchor(left, 'a'), 'dragstart');
@@ -114,7 +114,7 @@ describe('dnd.use_html5 parity', () => {
 
     it('should not drag with pointer events', () => {
       const tree = build(left);
-      const start = jest.fn();
+      const start = vi.fn();
       tree.on('dnd_start.MDFolderTree', start);
 
       anchor(left, 'a').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0, button: 0 }));
@@ -126,7 +126,7 @@ describe('dnd.use_html5 parity', () => {
 
     it('should honor is_draggable', () => {
       const tree = build(left, { is_draggable: () => false });
-      const start = jest.fn();
+      const start = vi.fn();
       tree.on('dnd_start.MDFolderTree', start);
 
       fire(anchor(left, 'a'), 'dragstart');
@@ -139,7 +139,7 @@ describe('dnd.use_html5 parity', () => {
   describe('dropping', () => {
     it('should move a node dropped after another', () => {
       const tree = build(left);
-      const stop = jest.fn();
+      const stop = vi.fn();
       tree.on('dnd_stop.MDFolderTree', stop);
 
       dragDrop(anchor(left, 'a'), anchor(left, 'c'), 129);
@@ -189,7 +189,7 @@ describe('dnd.use_html5 parity', () => {
     });
 
     it('should report a refused drop through core.error', () => {
-      const error = jest.fn();
+      const error = vi.fn();
       const tree = build(left, {}, { check_callback: (op: string) => op !== 'move_node', error });
 
       dragDrop(anchor(left, 'a'), anchor(left, 'c'), 129);
@@ -200,7 +200,7 @@ describe('dnd.use_html5 parity', () => {
 
     it('should end an abandoned drag without dropping', () => {
       const tree = build(left);
-      const stop = jest.fn();
+      const stop = vi.fn();
       tree.on('dnd_stop.MDFolderTree', stop);
       place(anchor(left, 'c'));
 

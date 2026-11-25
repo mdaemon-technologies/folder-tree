@@ -33,7 +33,7 @@ describe('JsonParser', () => {
 
   it('should generate IDs for nodes without them', () => {
     const parser = new JsonParser();
-    const result = parser.parse([{ text: 'No ID' } as any]);
+    const result = parser.parse([{ text: 'No ID' }]);
 
     expect(result[0].id).toBeTruthy();
     expect(result[0].id).toMatch(/^mdft_/);

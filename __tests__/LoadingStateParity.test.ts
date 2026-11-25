@@ -45,7 +45,7 @@ describe('loading state parity', () => {
 
   describe('a node being loaded', () => {
     it('should carry the loading class and mark its anchor busy', () => {
-      const { tree, release } = lazyTree();
+      const { tree } = lazyTree();
 
       tree.load_node('lz');
 

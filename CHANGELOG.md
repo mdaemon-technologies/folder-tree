@@ -5,7 +5,63 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2026-09-14
+## [Unreleased]
+
+## [2.1.0] - 2026-11-25
+
+### Added
+
+- **`NewNodeData`**, the type of node data entering the tree: every field is
+  optional, at any depth, since missing ids are generated and missing text
+  defaults.
+
+### Fixed
+
+- **`create_node` and `createNode` accept the nodes they document.** Both take
+  `NewNodeData`, so `create_node(par, { text: 'A', children: [{ text: 'B' }] })`
+  compiles, as jstree allows. They previously required an `id` and `text` on the
+  node and on every nested child. `check()` takes such a node for `create_node`.
+- **Every other way data enters the tree accepts nodes without ids too:**
+  `core.data` (an array or a callback), the `massload` callback and
+  `JsonParser.parse`, as in jstree. A plugin's `onCheck` is typed to receive
+  such a node for `create_node`, which is what it was always given.
+- **The jstree codemod accepts an absolute path.**
+  `node migrate-from-jstree.mjs /path/to/app` appended the absolute path to the
+  current directory and reported that the directory did not exist. Relative
+  paths worked and still do.
+
+### Changed
+
+- **The package includes `CHANGELOG.md`.**
+- **Development: Jest → Vitest.** The suite runs on Vitest 5 and jsdom 31. It
+  shares one environment across files, with a guard that fails any test leaving
+  a tree, DOM, fake timers or a stubbed global behind, and CI also runs it
+  isolated once. `npm run typecheck` now type-checks the tests as well; before,
+  nothing did. The twenty tests written with `done` callbacks now await
+  promises (one became synchronous), and each fails when its expectation is
+  broken. The suite runs on Node 22, 24 and 26 (Vitest 5 and jsdom 31 need
+  Node 22.22+).
+- **Development: Node 20 smoke tests.** On Node 20, the `engines` floor, CI
+  smoke-tests the built bundles and the `migrate-from-jstree.mjs` codemod with
+  plain `node:test` (`npm run test:smoke`). The codemod had no tests before.
+  A release now publishes the build that passed the tests, and only after it
+  also passes on Node 20.
+- **Development: TypeScript 6 → 7.** `npm run typecheck` runs TypeScript 7.0.
+  The tools that need a compiler API (typescript-eslint and the declaration
+  bundling) keep TypeScript 6.0's compiler API through the `@typescript/typescript6`
+  alias; see "TypeScript 6 and 7 side by side" in the README. The built bundles
+  and declarations are byte-for-byte the same.
+
+## [2.0.1] - 2026-09-21
+
+2.0.0 was not published to npm. 2.0.1 is the first 2.x release on npm and
+contains everything listed under 2.0.0.
+
+### Added
+
+- **`engines`** declares Node 20 or later.
+
+## 2.0.0 - 2026-09-14
 
 Remediation of critical defects found during a full code review. Every change in
 this release is covered by regression tests written against the previous behavior.
@@ -760,7 +816,7 @@ this release is covered by regression tests written against the previous behavio
   - Clicking a checkbox now honors `tie_selection`, `three_state` and the
     `cascade_to_disabled` / `cascade_to_hidden` options. The click path ran a
     second cascade implementation inside the core that ignored all of them; it
-    has been removed in favour of the plugin's.
+    has been removed in favor of the plugin's.
   - Toggling a checkbox emits `changed`, so `StatePlugin` persists checkbox
     interaction and consumers listening for `changed` see it. Unchecking now
     emits `deselect_node` rather than `select_node`.
@@ -867,7 +923,8 @@ this release is covered by regression tests written against the previous behavio
 - ESM, CJS and UMD builds, with the stylesheet available via the `./styles` and
   `./styles.css` subpath exports.
 
-[2.0.0]: https://www.npmjs.com/package/@mdaemon/folder-tree/v/2.0.0
+[2.1.0]: https://www.npmjs.com/package/@mdaemon/folder-tree/v/2.1.0
+[2.0.1]: https://www.npmjs.com/package/@mdaemon/folder-tree/v/2.0.1
 [1.0.4]: https://www.npmjs.com/package/@mdaemon/folder-tree/v/1.0.4
 [1.0.3]: https://www.npmjs.com/package/@mdaemon/folder-tree/v/1.0.3
 [1.0.2]: https://www.npmjs.com/package/@mdaemon/folder-tree/v/1.0.2

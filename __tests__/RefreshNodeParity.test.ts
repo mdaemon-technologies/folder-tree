@@ -143,7 +143,7 @@ describe('refresh_node parity', () => {
     tree.load_node('c1');
     flush();
     tree.open_node('c1');
-    const refreshed = jest.fn();
+    const refreshed = vi.fn();
     tree.on('refresh_node.MDFolderTree', refreshed);
 
     tree.refresh_node('p');
@@ -227,7 +227,7 @@ describe('refresh_node parity', () => {
       tree.load_node('p');
       pending.shift()!();
       tree.select_node('c2');
-      const changed = jest.fn();
+      const changed = vi.fn();
       tree.on('changed.MDFolderTree', changed);
 
       tree.load_node('p');

@@ -32,7 +32,7 @@ describe('Theme Runtime API', () => {
   });
 
   test('set_theme emits set_theme event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('set_theme.MDFolderTree', handler);
     tree.set_theme('compact');
     expect(handler).toHaveBeenCalled();
@@ -59,8 +59,6 @@ describe('Theme Runtime API', () => {
 
   describe('theme persistence', () => {
     it('should keep the active theme class after a redraw', () => {
-      const tree = new MDFolderTree(container, { core: { data: sampleData } });
-
       tree.set_theme('dark');
       tree.redraw();
 
@@ -70,8 +68,6 @@ describe('Theme Runtime API', () => {
     });
 
     it('should keep the default theme class when no theme is set', () => {
-      const tree = new MDFolderTree(container, { core: { data: sampleData } });
-
       tree.redraw();
 
       expect(container.classList.contains('md-tree-default')).toBe(true);

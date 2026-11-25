@@ -195,7 +195,7 @@ describe('dnd drag start parity', () => {
 
     it('should cancel the drag on Escape', () => {
       const tree = build();
-      const stopped = jest.fn();
+      const stopped = vi.fn();
       tree.on('dnd_stop.MDFolderTree', stopped);
 
       down(anchor('a'));

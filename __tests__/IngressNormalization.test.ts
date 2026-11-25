@@ -28,7 +28,7 @@ describe('Ingress normalization', () => {
             if (node.id === '#') {
               callback([{ id: 'root', text: 'Root', children: true } as TreeNodeData]);
             } else {
-              callback([{ text: 'No id supplied' } as TreeNodeData]);
+              callback([{ text: 'No id supplied' }]);
             }
           },
         },
@@ -93,7 +93,7 @@ describe('Ingress normalization', () => {
     it('should not render the string "undefined" when text is omitted', () => {
       const tree = new MDFolderTree(container, { core: { data: [{ id: 'a', text: 'A' }], check_callback: true } });
 
-      const created = tree.createNode('#', {} as TreeNodeData);
+      const created = tree.createNode('#', {});
 
       expect(created).not.toBe(false);
       expect((created as { text: string }).text).toBe('');
@@ -104,7 +104,7 @@ describe('Ingress normalization', () => {
   describe('generated ids', () => {
     it('should not collide with ids already in the tree', () => {
       const tree = new MDFolderTree(container, {
-        core: { data: [{ id: 'mdft_1', text: 'Squatter' }, { text: 'Generated' } as TreeNodeData] },
+        core: { data: [{ id: 'mdft_1', text: 'Squatter' }, { text: 'Generated' }] },
       });
 
       expect(tree.getNode('mdft_1')!.text).toBe('Squatter');

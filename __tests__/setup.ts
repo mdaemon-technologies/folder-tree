@@ -1,7 +1,12 @@
-import '@testing-library/jest-dom';
 // The built-in plugin names, as the package entries register them for a
 // consumer. Tests reach for `src/MDFolderTree` directly, which registers none.
 import '../src/plugins/register';
+import { MDFolderTree } from '../src/MDFolderTree';
+import { assertNoLeaks, trackTrees } from './helpers/leaks';
+
+// The leak guard (see vitest.config.ts): runs after each file's own teardown.
+trackTrees(MDFolderTree);
+afterEach(assertNoLeaks);
 
 // Polyfill CSS.escape for jsdom
 if (typeof CSS === 'undefined') {

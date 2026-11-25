@@ -158,6 +158,8 @@ A Node.js script is included that scans your codebase, reports what needs to cha
 node node_modules/@mdaemon/folder-tree/scripts/migrate-from-jstree.mjs ./src
 ```
 
+The directory may be relative to the current one or absolute.
+
 The script will:
 1. Print a checklist of all required changes with file names and line numbers
 2. Ask if you want it to apply the changes automatically
@@ -286,10 +288,27 @@ npm install
 npm run build        # ESM/CJS and UMD builds
 npm run build:umd    # UMD bundle only
 npm run dev          # Watch mode
-npm test             # Run tests
-npm run typecheck    # TypeScript check
+npm test             # Run tests (Vitest)
+npm run test:smoke   # Check the built bundles and the codemod with plain Node (build first)
+npm run typecheck    # TypeScript 7 check of src and tests
 npm run lint         # ESLint
 ```
+
+### TypeScript 6 and 7 side by side
+
+TypeScript 7 ships no JavaScript compiler API yet. So, as the [TypeScript 7.0 release notes](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0) recommend, two aliases are installed:
+
+- `@typescript/native` is `typescript@7`. `npm run typecheck` calls its compiler by path. Don't change that to a bare `tsc`: the TypeScript 6 package below depends on `@typescript/old` (typescript 6.0), which also installs a `tsc`, and whichever package npm linked last owns the bare command.
+- `typescript` is `@typescript/typescript6`, the TypeScript 6 compiler API. typescript-eslint, vite-plugin-dts and dts-bundle-generator import it. It also installs `tsc6`.
+
+The TypeScript 6 alias can go once TypeScript ships its new API (planned for 7.1), and typescript-eslint, vite-plugin-dts (through unplugin-dts) and dts-bundle-generator each have a release that uses it. Then:
+
+1. Set `"typescript": "^7.1.0"` (or whichever release ships the API), and remove `@typescript/native`.
+2. Point `typecheck` back at `tsc`.
+3. Upgrade the three tools.
+   - vite-plugin-dts is used only for its `afterBuild` hook, so it can be replaced by a `closeBundle` hook that runs dts-bundle-generator.
+   - Keep dts-bundle-generator on 9.x while CI tests Node versions below 24.
+4. Check `npm ls typescript` shows no `@typescript/typescript6`, and that `npm run build` output in `dist/` is byte-identical to the build before the change.
 
 ## Acknowledgments
 

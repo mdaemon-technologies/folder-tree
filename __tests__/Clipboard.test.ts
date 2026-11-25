@@ -88,7 +88,7 @@ describe('Clipboard (cut/copy/paste)', () => {
     const result = tree.paste('folder-2');
     expect(result).toBe(true);
     // Original still exists
-    expect(tree.get_node('file-1')).not.toBeNull();
+    expect(tree.get_node('file-1')).not.toBe(false);
     // folder-2 should have new child
     const folder2 = tree.get_node('folder-2');
     expect((folder2 as any).children.length).toBe(2);
@@ -110,14 +110,14 @@ describe('Clipboard (cut/copy/paste)', () => {
   });
 
   test('cut emits event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('cut.MDFolderTree', handler);
     tree.cut('file-1');
     expect(handler).toHaveBeenCalled();
   });
 
   test('paste emits event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('paste.MDFolderTree', handler);
     tree.cut('file-1');
     tree.paste('folder-2');

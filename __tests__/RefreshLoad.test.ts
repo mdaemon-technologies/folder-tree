@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
 import type { TreeNodeData } from '../src/types';
+import { delay } from './helpers/async';
 
 describe('Refresh & Load', () => {
   let container: HTMLElement;
@@ -28,8 +29,8 @@ describe('Refresh & Load', () => {
     tree.refresh();
 
     // Nodes still exist
-    expect(tree.get_node('n1')).not.toBeNull();
-    expect(tree.get_node('n2')).not.toBeNull();
+    expect(tree.get_node('n1')).not.toBe(false);
+    expect(tree.get_node('n2')).not.toBe(false);
     // Selection is restored
     expect(tree.is_selected('n1')).toBe(true);
   });
@@ -38,13 +39,13 @@ describe('Refresh & Load', () => {
     const data: TreeNodeData[] = [{ id: 'n1', text: 'Node 1' }];
     const tree = new MDFolderTree(container, { core: { data } });
 
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('refresh.MDFolderTree', handler);
     tree.refresh();
     expect(handler).toHaveBeenCalled();
   });
 
-  test('load_node triggers callback for lazy data', (done) => {
+  test('load_node triggers callback for lazy data', async () => {
     const lazyData: Record<string, TreeNodeData[]> = {
       '#': [{ id: 'root', text: 'Root', children: true as unknown as TreeNodeData[] }],
       root: [
@@ -62,27 +63,25 @@ describe('Refresh & Load', () => {
     });
 
     // Wait for initial load
-    setTimeout(() => {
-      tree.load_node('root', (node, status) => {
-        expect(status).toBe(true);
-        expect(tree.get_node('lazy-1')).not.toBeNull();
-        expect(tree.get_node('lazy-2')).not.toBeNull();
-        done();
-      });
-    }, 50);
+    await delay(50);
+    const status = await new Promise<boolean>((resolve) => tree.load_node('root', (_node, ok) => resolve(ok)));
+
+    expect(status).toBe(true);
+    expect(tree.get_node('lazy-1')).not.toBe(false);
+    expect(tree.get_node('lazy-2')).not.toBe(false);
   });
 
   test('load_node returns true for an existing node even when static data cannot load it, as jstree does', () => {
     const tree = new MDFolderTree(container, {
       core: { data: [{ id: 'n1', text: 'Node' }] },
     });
-    const callback = jest.fn();
+    const callback = vi.fn();
     const result = tree.load_node('n1', callback);
     expect(result).toBe(true);
     expect(callback).toHaveBeenCalledWith(expect.objectContaining({ id: 'n1' }), false);
   });
 
-  test('load_node emits load_node event', (done) => {
+  test('load_node emits load_node event', async () => {
     const lazyData: Record<string, TreeNodeData[]> = {
       '#': [{ id: 'root', text: 'Root', children: true as unknown as TreeNodeData[] }],
       root: [{ id: 'child1', text: 'Child 1' }],
@@ -96,18 +95,16 @@ describe('Refresh & Load', () => {
       },
     });
 
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('load_node.MDFolderTree', handler);
 
-    setTimeout(() => {
-      tree.load_node('root', () => {
-        expect(handler).toHaveBeenCalled();
-        done();
-      });
-    }, 50);
+    await delay(50);
+    await new Promise<void>((resolve) => tree.load_node('root', () => resolve()));
+
+    expect(handler).toHaveBeenCalled();
   });
 
-  test('load_all loads all unloaded nodes', (done) => {
+  test('load_all loads all unloaded nodes', async () => {
     const tree = new MDFolderTree(container, {
       core: {
         data: (node: any, cb: (d: TreeNodeData[]) => void) => {
@@ -120,20 +117,18 @@ describe('Refresh & Load', () => {
       },
     });
 
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('load_all.MDFolderTree', handler);
 
-    setTimeout(() => {
-      tree.load_all(undefined, () => {
-        // As in jstree, the callback runs just before load_all is emitted.
-        expect(handler).not.toHaveBeenCalled();
-        setTimeout(() => {
-          expect(handler).toHaveBeenCalledTimes(1);
-          expect(tree.get_node('a-child')).not.toBe(false);
-          done();
-        }, 0);
-      });
-    }, 50);
+    await delay(50);
+    // As in jstree, the callback runs just before load_all is emitted.
+    const emittedBeforeCallback = await new Promise<number>((resolve) =>
+      tree.load_all(undefined, () => resolve(handler.mock.calls.length)));
+    expect(emittedBeforeCallback).toBe(0);
+
+    await delay();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(tree.get_node('a-child')).not.toBe(false);
   });
 
   describe('refresh with an async data callback', () => {

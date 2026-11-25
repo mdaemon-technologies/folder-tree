@@ -13,6 +13,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# GitHub Release notes (release/notes.{version}.md), kept local
+release
+release/
+
 # Testing
 coverage/
 .nyc_output/

@@ -1,4 +1,4 @@
-import type { TreeNodeData } from '../types';
+import type { NewNodeData, TreeNodeData } from '../types';
 import { buildModel } from '../model';
 
 /**
@@ -17,7 +17,7 @@ export class JsonParser {
     this.generateId = generateId;
   }
 
-  parse(data: TreeNodeData[]): TreeNodeData[] {
+  parse(data: NewNodeData[]): TreeNodeData[] {
     const out = buildModel({
       data,
       parent: '#',

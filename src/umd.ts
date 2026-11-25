@@ -11,6 +11,7 @@ export type {
   TreeConfig,
   TreeNode,
   TreeNodeData,
+  NewNodeData,
   TreePlugin,
   TreePluginHost,
   EventHandler,

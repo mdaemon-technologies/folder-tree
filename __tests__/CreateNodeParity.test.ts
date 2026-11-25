@@ -48,7 +48,7 @@ describe('create_node parity', () => {
       const tree = build([], { strings: { 'New node': 'Nouveau' } });
 
       const bare = tree.create_node('#') as string;
-      const textless = tree.create_node('#', { id: 'x' } as TreeNodeData) as string;
+      const textless = tree.create_node('#', { id: 'x' }) as string;
 
       expect(tree.get_text(bare)).toBe('Nouveau');
       expect(tree.get_text(textless)).toBe('Nouveau');
@@ -68,6 +68,17 @@ describe('create_node parity', () => {
       expect((tree.get_node('s') as TreeNode).children_d).toEqual(['s1', 's2']);
     });
 
+    it('should generate ids for nested children given without them', () => {
+      const tree = build([]);
+
+      const id = tree.create_node('#', { text: 'S', children: [{ text: 'S1', children: [{ text: 'S2' }] }] }) as string;
+
+      const [s1] = kids(tree, id);
+      const [s2] = kids(tree, s1);
+      expect([tree.get_text(s1), tree.get_text(s2)]).toEqual(['S1', 'S2']);
+      expect(new Set([id, s1, s2]).size).toBe(3);
+    });
+
     it('should not modify the node object it is given', () => {
       const tree = build([]);
       const input = { id: 'n', text: 'N', children: [{ id: 'k', text: 'K' }] };
@@ -80,7 +91,7 @@ describe('create_node parity', () => {
 
     it('should call back with the new node', () => {
       const tree = build([]);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       tree.create_node('#', { id: 'n', text: 'N' }, 'last', callback);
 

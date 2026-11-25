@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
 import type { TreeNodeData } from '../src/types';
+import { delay } from './helpers/async';
 
 describe('Lazy loading regression tests', () => {
   let container: HTMLElement;
@@ -16,8 +17,8 @@ describe('Lazy loading regression tests', () => {
   });
 
   describe('nodes with children:true render as expandable', () => {
-    test('top-level node with children:true renders as closed (not leaf)', (done) => {
-      const tree = new MDFolderTree(container, {
+    test('top-level node with children:true renders as closed (not leaf)', async () => {
+      new MDFolderTree(container, {
         core: {
           data: (node: any, cb: (d: TreeNodeData[]) => void) => {
             if (node.id === '#') {
@@ -29,16 +30,14 @@ describe('Lazy loading regression tests', () => {
         },
       });
 
-      setTimeout(() => {
-        const el = container.querySelector('#folder');
-        expect(el).not.toBeNull();
-        expect(el!.classList.contains('md-tree-closed')).toBe(true);
-        expect(el!.classList.contains('md-tree-leaf')).toBe(false);
-        done();
-      }, 50);
+      await delay(50);
+      const el = container.querySelector('#folder');
+      expect(el).not.toBeNull();
+      expect(el!.classList.contains('md-tree-closed')).toBe(true);
+      expect(el!.classList.contains('md-tree-leaf')).toBe(false);
     });
 
-    test('nested node with children:true renders as closed (not leaf)', (done) => {
+    test('nested node with children:true renders as closed (not leaf)', async () => {
       const tree = new MDFolderTree(container, {
         core: {
           data: (node: any, cb: (d: TreeNodeData[]) => void) => {
@@ -57,25 +56,22 @@ describe('Lazy loading regression tests', () => {
         },
       });
 
-      setTimeout(() => {
-        const parent = tree.get_node('parent');
-        expect(parent).not.toBeNull();
-        // Open parent to see child rendered
-        tree.open_node('parent');
+      await delay(50);
+      const parent = tree.get_node('parent');
+      expect(parent).not.toBe(false);
+      // Open parent to see child rendered
+      tree.open_node('parent');
 
-        setTimeout(() => {
-          const childEl = container.querySelector('#child');
-          expect(childEl).not.toBeNull();
-          expect(childEl!.classList.contains('md-tree-closed')).toBe(true);
-          expect(childEl!.classList.contains('md-tree-leaf')).toBe(false);
-          done();
-        }, 50);
-      }, 50);
+      await delay(50);
+      const childEl = container.querySelector('#child');
+      expect(childEl).not.toBeNull();
+      expect(childEl!.classList.contains('md-tree-closed')).toBe(true);
+      expect(childEl!.classList.contains('md-tree-leaf')).toBe(false);
     });
   });
 
   describe('open_node triggers lazy loading at any depth', () => {
-    test('open_node on unloaded top-level node loads children', (done) => {
+    test('open_node on unloaded top-level node loads children', async () => {
       const tree = new MDFolderTree(container, {
         core: {
           data: (node: any, cb: (d: TreeNodeData[]) => void) => {
@@ -93,21 +89,18 @@ describe('Lazy loading regression tests', () => {
         },
       });
 
-      setTimeout(() => {
-        tree.open_node('root');
+      await delay(50);
+      tree.open_node('root');
 
-        setTimeout(() => {
-          expect(tree.get_node('c1')).not.toBeNull();
-          expect(tree.get_node('c2')).not.toBeNull();
-          const rootNode = tree.get_node('root');
-          expect(rootNode!.state.opened).toBe(true);
-          expect(rootNode!.state.loaded).toBe(true);
-          done();
-        }, 50);
-      }, 50);
+      await delay(50);
+      expect(tree.get_node('c1')).not.toBe(false);
+      expect(tree.get_node('c2')).not.toBe(false);
+      const rootNode = tree.getNode('root');
+      expect(rootNode!.state.opened).toBe(true);
+      expect(rootNode!.state.loaded).toBe(true);
     });
 
-    test('open_node on unloaded second-level node loads its children', (done) => {
+    test('open_node on unloaded second-level node loads its children', async () => {
       const tree = new MDFolderTree(container, {
         core: {
           data: (node: any, cb: (d: TreeNodeData[]) => void) => {
@@ -131,27 +124,23 @@ describe('Lazy loading regression tests', () => {
         },
       });
 
-      setTimeout(() => {
-        // Open root first (already loaded)
-        tree.open_node('root');
+      await delay(50);
+      // Open root first (already loaded)
+      tree.open_node('root');
 
-        setTimeout(() => {
-          // Now open mid (needs lazy load)
-          tree.open_node('mid');
+      await delay(50);
+      // Now open mid (needs lazy load)
+      tree.open_node('mid');
 
-          setTimeout(() => {
-            expect(tree.get_node('deep1')).not.toBeNull();
-            expect(tree.get_node('deep2')).not.toBeNull();
-            const midNode = tree.get_node('mid');
-            expect(midNode!.state.opened).toBe(true);
-            expect(midNode!.state.loaded).toBe(true);
-            done();
-          }, 50);
-        }, 50);
-      }, 50);
+      await delay(50);
+      expect(tree.get_node('deep1')).not.toBe(false);
+      expect(tree.get_node('deep2')).not.toBe(false);
+      const midNode = tree.getNode('mid');
+      expect(midNode!.state.opened).toBe(true);
+      expect(midNode!.state.loaded).toBe(true);
     });
 
-    test('open_node on unloaded third-level node loads its children', (done) => {
+    test('open_node on unloaded third-level node loads its children', async () => {
       const tree = new MDFolderTree(container, {
         core: {
           data: (node: any, cb: (d: TreeNodeData[]) => void) => {
@@ -170,25 +159,20 @@ describe('Lazy loading regression tests', () => {
         },
       });
 
-      setTimeout(() => {
-        tree.open_node('l1');
-        setTimeout(() => {
-          tree.open_node('l2');
-          setTimeout(() => {
-            tree.open_node('l3');
-            setTimeout(() => {
-              expect(tree.get_node('leaf')).not.toBeNull();
-              const l3 = tree.get_node('l3');
-              expect(l3!.state.opened).toBe(true);
-              expect(l3!.state.loaded).toBe(true);
-              done();
-            }, 50);
-          }, 50);
-        }, 50);
-      }, 50);
+      await delay(50);
+      tree.open_node('l1');
+      await delay(50);
+      tree.open_node('l2');
+      await delay(50);
+      tree.open_node('l3');
+      await delay(50);
+      expect(tree.get_node('leaf')).not.toBe(false);
+      const l3 = tree.getNode('l3');
+      expect(l3!.state.opened).toBe(true);
+      expect(l3!.state.loaded).toBe(true);
     });
 
-    test('open_node on already-loaded node does not re-fetch', (done) => {
+    test('open_node on already-loaded node does not re-fetch', async () => {
       let callCount = 0;
 
       const tree = new MDFolderTree(container, {
@@ -206,24 +190,20 @@ describe('Lazy loading regression tests', () => {
         },
       });
 
-      setTimeout(() => {
-        const initialCalls = callCount;
-        tree.open_node('root');
+      await delay(50);
+      const initialCalls = callCount;
+      tree.open_node('root');
 
-        setTimeout(() => {
-          const afterFirstOpen = callCount;
-          expect(afterFirstOpen).toBe(initialCalls + 1);
+      await delay(50);
+      const afterFirstOpen = callCount;
+      expect(afterFirstOpen).toBe(initialCalls + 1);
 
-          // Close and re-open — should not fetch again
-          tree.close_node('root');
-          tree.open_node('root');
+      // Close and re-open — should not fetch again
+      tree.close_node('root');
+      tree.open_node('root');
 
-          setTimeout(() => {
-            expect(callCount).toBe(afterFirstOpen);
-            done();
-          }, 50);
-        }, 50);
-      }, 50);
+      await delay(50);
+      expect(callCount).toBe(afterFirstOpen);
     });
   });
 
@@ -235,7 +215,7 @@ describe('Lazy loading regression tests', () => {
       });
 
       tree.select_node('n1');
-      const node = tree.get_node('n1');
+      const node = tree.getNode('n1');
       expect(node!.state.selected).toBe(true);
       expect(node!.state.checked).toBe(true);
     });
@@ -248,7 +228,7 @@ describe('Lazy loading regression tests', () => {
 
       tree.select_node('n1');
       tree.deselect_node('n1');
-      const node = tree.get_node('n1');
+      const node = tree.getNode('n1');
       expect(node!.state.selected).toBe(false);
       expect(node!.state.checked).toBe(false);
     });
@@ -261,7 +241,7 @@ describe('Lazy loading regression tests', () => {
       });
 
       tree.select_node('n1');
-      const node = tree.get_node('n1');
+      const node = tree.getNode('n1');
       expect(node!.state.selected).toBe(true);
       expect(node!.state.checked).toBe(false);
     });
@@ -273,7 +253,7 @@ describe('Lazy loading regression tests', () => {
       });
 
       tree.check_node('n1');
-      const node = tree.get_node('n1');
+      const node = tree.getNode('n1');
       expect(node!.state.checked).toBe(true);
       expect(node!.state.selected).toBe(true);
       expect(tree.get_selected()).toContain('n1');
@@ -298,11 +278,11 @@ describe('Lazy loading regression tests', () => {
           .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...init }));
 
       click('n1');
-      expect(tree.get_node('n1')!.state.checked).toBe(true);
+      expect(tree.getNode('n1')!.state.checked).toBe(true);
 
       click('n2');
-      expect(tree.get_node('n1')!.state.checked).toBe(false);
-      expect(tree.get_node('n2')!.state.checked).toBe(true);
+      expect(tree.getNode('n1')!.state.checked).toBe(false);
+      expect(tree.getNode('n2')!.state.checked).toBe(true);
     });
   });
 });

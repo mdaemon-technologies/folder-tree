@@ -56,6 +56,7 @@ export type {
   ConditionalSelectCallback,
   TreeNode,
   TreeNodeData,
+  NewNodeData,
   TreePlugin,
   TreePluginHost,
   EventHandler,

@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../../src/MDFolderTree';
 import type { TreeNodeData } from '../../src/types';
+import { nextEvent } from '../helpers/async';
 
 describe('DndPlugin', () => {
   let container: HTMLElement;
@@ -135,16 +136,12 @@ describe('DndPlugin', () => {
     expect(document.querySelector('.md-tree-dnd-helper')).toBeNull();
   });
 
-  it('should emit dnd_start event', (done) => {
+  it('should emit dnd_start event', async () => {
     new MDFolderTree(container, {
       core: { data: sampleData, check_callback: true },
       plugins: ['dnd'],
     });
-
-    container.addEventListener('dnd_start.MDFolderTree', ((e: CustomEvent) => {
-      expect(e.detail.node.id).toBe('file-a');
-      done();
-    }) as EventListener);
+    const started = nextEvent(container, 'dnd_start.MDFolderTree');
 
     const anchor = container.querySelector('#file-a .md-tree-anchor') as HTMLElement;
 
@@ -157,6 +154,9 @@ describe('DndPlugin', () => {
     }));
 
     document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+
+    const { detail } = await started;
+    expect(detail.node.id).toBe('file-a');
   });
 
   it('should respect is_draggable config', () => {

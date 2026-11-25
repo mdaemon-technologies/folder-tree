@@ -35,9 +35,11 @@ export default defineConfig(({ mode }) => {
       dts({
         insertTypesEntry: true,
         afterBuild: () => {
-          // Bundle all declarations into a single index.d.ts
+          // Bundle all declarations into a single index.d.ts. Every exported
+          // type there is public API, so export only what src/index.ts
+          // exports, not the internal types those reference.
           execSync(
-            'npx dts-bundle-generator -o dist/index.d.ts src/index.ts --no-banner',
+            'npx dts-bundle-generator -o dist/index.d.ts src/index.ts --no-banner --export-referenced-types false',
             { cwd: __dirname, stdio: 'pipe' },
           );
           // Copy styles type declaration

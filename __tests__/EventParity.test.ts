@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
 import type { TreeNode, TreeNodeData } from '../src/types';
+import { stubLocalStorage } from './helpers/storage';
 
 /**
  * Event parity with jstree 3.3.16.
@@ -133,7 +134,7 @@ describe('Event parity', () => {
 
     it('should call back with the node and whether open_node opened it', () => {
       const tree = build();
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       tree.open_node('p', callback);
       tree.open_node('p', callback);
@@ -191,22 +192,8 @@ describe('Event parity', () => {
 
   describe('restore_state', () => {
     it('should emit restore_state with the state once the state plugin has applied it', async () => {
-      const stored: Record<string, string> = {
+      stubLocalStorage({
         'event-parity-state': JSON.stringify({ state: { opened: ['p'], selected: ['leaf'] } }),
-      };
-      Object.defineProperty(window, 'localStorage', {
-        value: {
-          getItem: (key: string) => stored[key] ?? null,
-          setItem: (key: string, value: string) => {
-            stored[key] = value;
-          },
-          removeItem: (key: string) => {
-            delete stored[key];
-          },
-          clear: () => undefined,
-        },
-        writable: true,
-        configurable: true,
       });
       let detail: unknown = null;
       let openAtRestore: boolean | null = null;

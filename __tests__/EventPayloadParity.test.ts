@@ -33,7 +33,7 @@ describe('event payload parity', () => {
   const build = (el: HTMLElement, nodes = data()) =>
     new MDFolderTree(el, { core: { data: nodes, check_callback: true } });
   const listen = (tree: MDFolderTree, event: string) => {
-    const seen = jest.fn();
+    const seen = vi.fn();
     tree.on(`${event}.MDFolderTree`, (e) => seen((e as CustomEvent).detail));
     return seen;
   };

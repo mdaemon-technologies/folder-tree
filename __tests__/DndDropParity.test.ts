@@ -27,7 +27,7 @@ describe('dnd drop parity', () => {
     container.remove();
     document.elementFromPoint = realElementFromPoint;
     document.getElementById('vakata-dnd')?.remove();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   const data = (): TreeNodeData[] => [
@@ -255,13 +255,13 @@ describe('dnd drop parity', () => {
     });
 
     it('should open a closed node hovered inside after open_timeout', () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       const tree = build({ open_timeout: 300 });
 
       drag('a', anchor('shut'), 114, {}, false);
-      jest.advanceTimersByTime(299);
+      vi.advanceTimersByTime(299);
       expect(tree.is_open('shut')).toBe(false);
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
 
       expect(tree.is_open('shut')).toBe(true);
     });

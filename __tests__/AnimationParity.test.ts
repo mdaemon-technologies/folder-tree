@@ -13,7 +13,7 @@ describe('core.animation parity', () => {
   let container: HTMLElement;
 
   beforeEach(() => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     container = document.createElement('div');
     document.body.appendChild(container);
   });
@@ -21,7 +21,7 @@ describe('core.animation parity', () => {
   afterEach(() => {
     MDFolderTree.getInstance(container)?.destroy();
     container.remove();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   const data = (): TreeNodeData[] => [
@@ -49,21 +49,21 @@ describe('core.animation parity', () => {
     expect(seen).toEqual(['before_open', 'open_node']);
     expect(tree.is_open('p')).toBe(true);
 
-    jest.advanceTimersByTime(199);
+    vi.advanceTimersByTime(199);
     expect(seen).toEqual(['before_open', 'open_node']);
-    jest.advanceTimersByTime(1);
+    vi.advanceTimersByTime(1);
     expect(seen).toEqual(['before_open', 'open_node', 'after_open']);
   });
 
   it('should fire after_close once the slide has ended', () => {
     const tree = build({ animation: 100 });
     tree.open_node('p');
-    jest.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
     const seen = record(tree);
 
     tree.close_node('p');
     expect(seen).toEqual(['close_node']);
-    jest.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
 
     expect(seen).toEqual(['close_node', 'after_close']);
   });
@@ -73,7 +73,7 @@ describe('core.animation parity', () => {
 
     tree.open_node('p');
     expect(list('p').style.transition).toContain('200ms');
-    jest.advanceTimersByTime(200);
+    vi.advanceTimersByTime(200);
 
     expect(list('p').style.transition).toBe('');
     expect(list('p').style.height).toBe('');
@@ -82,11 +82,11 @@ describe('core.animation parity', () => {
   it('should keep closing children shown until the slide ends', () => {
     const tree = build();
     tree.open_node('p');
-    jest.advanceTimersByTime(200);
+    vi.advanceTimersByTime(200);
 
     tree.close_node('p');
     expect(list('p').style.display).toBe('block');
-    jest.advanceTimersByTime(200);
+    vi.advanceTimersByTime(200);
 
     expect(list('p').style.display).toBe('');
   });
@@ -105,7 +105,7 @@ describe('core.animation parity', () => {
     const seen = record(tree);
 
     tree.open_node('p', undefined, 50);
-    jest.advanceTimersByTime(50);
+    vi.advanceTimersByTime(50);
 
     expect(seen).toContain('after_open');
   });
@@ -127,7 +127,7 @@ describe('core.animation parity', () => {
 
     tree.open_node('p');
     tree.destroy();
-    jest.advanceTimersByTime(200);
+    vi.advanceTimersByTime(200);
 
     expect(seen).not.toContain('after_open');
   });

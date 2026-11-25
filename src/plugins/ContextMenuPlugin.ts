@@ -449,7 +449,7 @@ export class ContextMenuPlugin implements TreePlugin {
         label: 'Create',
         action: (data) => {
           const { inst, obj } = at(data as ItemData);
-          inst.create_node(obj, {} as never, 'last', (created) => inst.edit(created));
+          inst.create_node(obj, {}, 'last', (created) => inst.edit(created));
         },
       },
       rename: {

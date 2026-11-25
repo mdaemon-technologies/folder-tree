@@ -98,14 +98,14 @@ describe('Unique plugin parity', () => {
     it('should refuse a name a sibling has, as unique_04', () => {
       const tree = build();
 
-      expect(tree.create_node('#', { text: 'a' } as TreeNodeData)).toBe(false);
+      expect(tree.create_node('#', { text: 'a' })).toBe(false);
       expect(errorOf(tree).id).toBe('unique_04');
     });
 
     it('should name nodes created without text New node, New node (2), New node (3)', () => {
       const tree = build();
 
-      const ids = [tree.create_node('#'), tree.create_node('#'), tree.create_node('#', {} as TreeNodeData)];
+      const ids = [tree.create_node('#'), tree.create_node('#'), tree.create_node('#', {})];
 
       expect(ids.map((id) => tree.get_text(id as string))).toEqual(['New node', 'New node (2)', 'New node (3)']);
     });

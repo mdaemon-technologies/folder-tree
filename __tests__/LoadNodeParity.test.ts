@@ -41,7 +41,7 @@ describe('load_node parity', () => {
 
     it('should return true and fail through the callback for a non-root node', () => {
       const tree = staticTree();
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       expect(tree.load_node('a', callback)).toBe(true);
 
@@ -73,7 +73,7 @@ describe('load_node parity', () => {
     it('should reload the root from core.data', () => {
       const tree = staticTree();
       tree.delete_node('a');
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       expect(tree.load_node('#', callback)).toBe(true);
 
@@ -105,7 +105,7 @@ describe('load_node parity', () => {
     it('should fail a non-root node without reporting an error', () => {
       const errors: unknown[] = [];
       const tree = htmlTree(errors);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       tree.load_node('a', callback);
 
@@ -163,7 +163,7 @@ describe('load_node parity', () => {
       const tree = fnTree();
       const statuses: boolean[] = [];
       tree.on('load_node.MDFolderTree', (e) => statuses.push((e.detail as { status: boolean }).status));
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       tree.load_node('x', callback);
 
@@ -204,7 +204,7 @@ describe('load_node parity', () => {
 
     it('should load an array of nodes and call back once with the loaded ids', () => {
       const tree = fnTree();
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       expect(tree.load_node(['x', 'y'], callback)).toBe(true);
 
@@ -276,7 +276,7 @@ describe('load_node HTML responses', () => {
   it('should load the items of a <ul> in an HTML string', () => {
     const tree = htmlTree({ '#': '<ul><li id="a"><a>A</a></li><li id="b"><a>B</a></li></ul>' });
 
-    expect(tree.get_json().map((n) => n.id)).toEqual(['a', 'b']);
+    expect((tree.get_json() as TreeNodeData[]).map((n) => n.id)).toEqual(['a', 'b']);
   });
 
   it('should render a root loaded from an HTML string', () => {

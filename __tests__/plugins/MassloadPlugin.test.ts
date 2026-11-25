@@ -12,7 +12,7 @@ describe('MassloadPlugin', () => {
     it('should hand each prefetched answer out once', () => {
       const plugin = new MassloadPlugin();
       plugin.init(answering({ a: [{ id: 'x', text: 'X' }] }));
-      const proceed = jest.fn();
+      const proceed = vi.fn();
 
       plugin.prefetch(['a'], proceed);
 
@@ -24,7 +24,7 @@ describe('MassloadPlugin', () => {
     it('should proceed at once without a massload function', () => {
       const plugin = new MassloadPlugin();
       plugin.init(host(null));
-      const proceed = jest.fn();
+      const proceed = vi.fn();
 
       plugin.prefetch(['a'], proceed);
 

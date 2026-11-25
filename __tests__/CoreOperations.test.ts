@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
-import type { TreeNodeData } from '../src/types';
+import type { TreeNode, TreeNodeData } from '../src/types';
+import { nextEvent } from './helpers/async';
 
 describe('MDFolderTree - Core Operations', () => {
   let container: HTMLElement;
@@ -58,18 +59,17 @@ describe('MDFolderTree - Core Operations', () => {
       expect(result).toBe(false);
     });
 
-    it('should emit move_node event', (done) => {
+    it('should emit move_node event', async () => {
       const tree = new MDFolderTree(container, {
         core: { data: sampleData, check_callback: true },
       });
-
-      container.addEventListener('move_node.MDFolderTree', ((e: CustomEvent) => {
-        expect(e.detail.node.id).toBe('file-a');
-        expect(e.detail.parent).toBe('folder-2');
-        done();
-      }) as EventListener);
+      const moved = nextEvent(container, 'move_node.MDFolderTree');
 
       tree.moveNode('file-a', 'folder-2', 0);
+
+      const { detail } = await moved;
+      expect(detail.node.id).toBe('file-a');
+      expect(detail.parent).toBe('folder-2');
     });
 
     it('should respect position parameter', () => {
@@ -104,18 +104,17 @@ describe('MDFolderTree - Core Operations', () => {
       expect(copy!.text).toBe('File A');
     });
 
-    it('should emit copy_node event', (done) => {
+    it('should emit copy_node event', async () => {
       const tree = new MDFolderTree(container, {
         core: { data: sampleData, check_callback: true },
       });
-
-      container.addEventListener('copy_node.MDFolderTree', ((e: CustomEvent) => {
-        expect(e.detail.original.id).toBe('file-a');
-        expect(e.detail.parent).toBe('folder-2');
-        done();
-      }) as EventListener);
+      const copied = nextEvent(container, 'copy_node.MDFolderTree');
 
       tree.copyNode('file-a', 'folder-2', 0);
+
+      const { detail } = await copied;
+      expect(detail.original.id).toBe('file-a');
+      expect(detail.parent).toBe('folder-2');
     });
   });
 
@@ -144,17 +143,16 @@ describe('MDFolderTree - Core Operations', () => {
       expect(parent!.children).not.toContain('file-a');
     });
 
-    it('should emit delete_node event', (done) => {
+    it('should emit delete_node event', async () => {
       const tree = new MDFolderTree(container, {
         core: { data: sampleData, check_callback: true },
       });
-
-      container.addEventListener('delete_node.MDFolderTree', ((e: CustomEvent) => {
-        expect(e.detail.node.id).toBe('file-d');
-        done();
-      }) as EventListener);
+      const deleted = nextEvent(container, 'delete_node.MDFolderTree');
 
       tree.deleteNode('file-d');
+
+      const { detail } = await deleted;
+      expect(detail.node.id).toBe('file-d');
     });
 
     it('should deselect deleted nodes', () => {
@@ -199,18 +197,17 @@ describe('MDFolderTree - Core Operations', () => {
       expect(parent!.children[1]).toBe('inserted');
     });
 
-    it('should emit create_node event', (done) => {
+    it('should emit create_node event', async () => {
       const tree = new MDFolderTree(container, {
         core: { data: sampleData, check_callback: true },
       });
-
-      container.addEventListener('create_node.MDFolderTree', ((e: CustomEvent) => {
-        expect(e.detail.node.id).toBe('created');
-        expect(e.detail.parent).toBe('folder-1');
-        done();
-      }) as EventListener);
+      const created = nextEvent(container, 'create_node.MDFolderTree');
 
       tree.createNode('folder-1', { id: 'created', text: 'Created Node' });
+
+      const { detail } = await created;
+      expect(detail.node.id).toBe('created');
+      expect(detail.parent).toBe('folder-1');
     });
 
     it('should generate an ID if none provided', () => {
@@ -218,9 +215,9 @@ describe('MDFolderTree - Core Operations', () => {
         core: { data: sampleData, check_callback: true },
       });
 
-      const result = tree.createNode('folder-1', { id: '', text: 'Auto ID' });
+      const result = tree.createNode('folder-1', { text: 'Auto ID' });
       expect(result).not.toBe(false);
-      expect((result as any).id).toMatch(/^new_/);
+      expect((result as TreeNode).id).toMatch(/^new_/);
     });
   });
 
@@ -237,19 +234,18 @@ describe('MDFolderTree - Core Operations', () => {
       expect(node!.text).toBe('Renamed File');
     });
 
-    it('should emit rename_node event with old text', (done) => {
+    it('should emit rename_node event with old text', async () => {
       const tree = new MDFolderTree(container, {
         core: { data: sampleData, check_callback: true },
       });
-
-      container.addEventListener('rename_node.MDFolderTree', ((e: CustomEvent) => {
-        expect(e.detail.node.id).toBe('file-a');
-        expect(e.detail.text).toBe('New Name');
-        expect(e.detail.old).toBe('File A');
-        done();
-      }) as EventListener);
+      const renamed = nextEvent(container, 'rename_node.MDFolderTree');
 
       tree.renameNode('file-a', 'New Name');
+
+      const { detail } = await renamed;
+      expect(detail.node.id).toBe('file-a');
+      expect(detail.text).toBe('New Name');
+      expect(detail.old).toBe('File A');
     });
   });
 
@@ -315,7 +311,7 @@ describe('MDFolderTree - Core Operations', () => {
 
   describe('check_callback', () => {
     it('should call custom check_callback function', () => {
-      const checkFn = jest.fn().mockReturnValue(true);
+      const checkFn = vi.fn().mockReturnValue(true);
       const tree = new MDFolderTree(container, {
         core: { data: sampleData, check_callback: checkFn },
       });

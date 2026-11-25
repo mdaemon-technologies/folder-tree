@@ -4,14 +4,11 @@ import type { MDFolderTree } from './MDFolderTree';
 // Core tree interfaces & types
 // ============================================================
 
-/** Raw node data as provided by the consumer (JSON or parsed from HTML). */
-export interface TreeNodeData {
-  id: string;
-  text: string;
+/** The optional fields node data shares, whether it describes a node or one to create. */
+interface NodeDataFields {
   /** True (the theme icon, the default), false (none), or a class list or image URL. */
   icon?: string | boolean | null;
   type?: string;
-  children?: TreeNodeData[] | boolean;
   /** Layered over `data.jstree` and the defaults, as in jstree; any key is kept. */
   state?: {
     opened?: boolean;
@@ -26,6 +23,23 @@ export interface TreeNodeData {
   /** User data. `get_json` reports it as `false` under `no_data`, as jstree does. */
   data?: Record<string, unknown> | false | null;
   [key: string]: unknown;
+}
+
+/** Raw node data as provided by the consumer (JSON or parsed from HTML). */
+export interface TreeNodeData extends NodeDataFields {
+  id: string;
+  text: string;
+  children?: TreeNodeData[] | boolean;
+}
+
+/**
+ * A node to create (`create_node`, `createNode`): any field may be left out,
+ * at any depth. Missing ids are generated and missing text defaults, as in jstree.
+ */
+export interface NewNodeData extends NodeDataFields {
+  id?: string;
+  text?: string;
+  children?: NewNodeData[] | boolean;
 }
 
 /** Internal node representation stored in the tree's flat map. */
@@ -71,7 +85,7 @@ export interface TreeNode {
 export type DataCallback = (
   this: MDFolderTree,
   node: TreeNode,
-  callback: (data: TreeNodeData[] | string | false) => void,
+  callback: (data: NewNodeData[] | string | false) => void,
 ) => void;
 
 /**
@@ -98,7 +112,7 @@ export interface CoreConfig {
    * The nodes: an array, a function, an ajax config, or an HTML string (for
    * the root) — as jstree's `core.data`. Absent, the container's markup.
    */
-  data?: TreeNodeData[] | DataCallback | AjaxConfig | string | false;
+  data?: NewNodeData[] | DataCallback | AjaxConfig | string | false;
   multiple?: boolean;
   animation?: number;
   themes?: ThemeConfig;
@@ -272,7 +286,7 @@ export interface DndConfig {
 export type MassloadCallback = (
   this: MDFolderTree,
   ids: string[],
-  callback: (data: Record<string, TreeNodeData[] | string> | null | false) => void,
+  callback: (data: Record<string, NewNodeData[] | string> | null | false) => void,
 ) => void;
 
 /**
@@ -365,7 +379,7 @@ export interface TreePlugin {
    */
   onCheck?(
     chk: string,
-    node: TreeNode | TreeNodeData | null,
+    node: TreeNode | NewNodeData | null,
     parent: TreeNode | null,
     pos: unknown,
     more: CheckMore,
@@ -403,7 +417,7 @@ export interface TreePluginHost {
   copyNode(id: string, parentId: string, position: number): string | false;
   renameNode(id: string, text: string): boolean;
   deleteNode(id: string): boolean;
-  createNode(parentId: string, data: TreeNodeData, position?: number): TreeNode | false;
+  createNode(parentId: string, data: NewNodeData, position?: number): TreeNode | false;
   reorderChildren(parentId: string, childIds: string[]): void;
   /** Reorder a parent's children in the model only, without rendering. */
   setChildOrder(parentId: string, childIds: string[]): void;

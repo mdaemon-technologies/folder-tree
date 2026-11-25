@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../../src/MDFolderTree';
 import type { TreeNodeData } from '../../src/types';
+import { nextEvent } from '../helpers/async';
 
 describe('ChangedPlugin', () => {
   let container: HTMLElement;
@@ -21,20 +22,19 @@ describe('ChangedPlugin', () => {
     document.body.removeChild(container);
   });
 
-  it('should include changed.selected and changed.deselected in event data', (done) => {
+  it('should include changed.selected and changed.deselected in event data', async () => {
     const tree = new MDFolderTree(container, {
       core: { data: sampleData },
       plugins: ['changed'],
     });
-
-    container.addEventListener('changed.MDFolderTree', ((e: CustomEvent) => {
-      expect(e.detail.changed).toBeDefined();
-      expect(e.detail.changed.selected).toContain('n1');
-      expect(e.detail.changed.deselected).toEqual([]);
-      done();
-    }) as EventListener);
+    const changed = nextEvent(container, 'changed.MDFolderTree');
 
     tree.select_node('n1');
+
+    const { detail } = await changed;
+    expect(detail.changed).toBeDefined();
+    expect(detail.changed.selected).toContain('n1');
+    expect(detail.changed.deselected).toEqual([]);
   });
 
   it('should report deselected nodes when deselecting', () => {

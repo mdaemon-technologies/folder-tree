@@ -140,14 +140,14 @@ describe('Checkbox Plugin - Full API', () => {
   // the selection events fire. check_node / uncheck_node events fire only when
   // tie_selection is false (covered in ActivationParity.test.ts).
   test('check_node emits select_node when tie_selection is on', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('select_node.MDFolderTree', handler);
     tree.check_node('solo');
     expect(handler).toHaveBeenCalled();
   });
 
   test('uncheck_node emits deselect_node when tie_selection is on', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('deselect_node.MDFolderTree', handler);
     tree.check_node('solo');
     tree.uncheck_node('solo');

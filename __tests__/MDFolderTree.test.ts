@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
-import type { TreeConfig, TreeNodeData } from '../src/types';
+import type { TreeNodeData } from '../src/types';
+import { nextEvent } from './helpers/async';
 
 describe('MDFolderTree', () => {
   let container: HTMLElement;
@@ -61,7 +62,7 @@ describe('MDFolderTree', () => {
   it('should get node by ID', () => {
     const tree = new MDFolderTree(container, { core: { data: sampleData } });
 
-    const node = tree.get_node('node-1');
+    const node = tree.getNode('node-1');
     expect(node).not.toBeNull();
     expect(node!.text).toBe('Node 1');
   });
@@ -98,31 +99,31 @@ describe('MDFolderTree', () => {
     const tree = new MDFolderTree(container, { core: { data: sampleData } });
 
     tree.open_node('node-1');
-    const node = tree.get_node('node-1');
+    const node = tree.getNode('node-1');
     expect(node!.state.opened).toBe(true);
 
     tree.close_node('node-1');
-    expect(tree.get_node('node-1')!.state.opened).toBe(false);
+    expect(tree.getNode('node-1')!.state.opened).toBe(false);
   });
 
   it('should open all and close all', () => {
     const tree = new MDFolderTree(container, { core: { data: sampleData } });
 
     tree.open_all();
-    expect(tree.get_node('node-1')!.state.opened).toBe(true);
+    expect(tree.getNode('node-1')!.state.opened).toBe(true);
 
     tree.close_all();
-    expect(tree.get_node('node-1')!.state.opened).toBe(false);
+    expect(tree.getNode('node-1')!.state.opened).toBe(false);
   });
 
   it('should enable and disable nodes', () => {
     const tree = new MDFolderTree(container, { core: { data: sampleData } });
 
     tree.disable_node('node-1');
-    expect(tree.get_node('node-1')!.state.disabled).toBe(true);
+    expect(tree.getNode('node-1')!.state.disabled).toBe(true);
 
     tree.enable_node('node-1');
-    expect(tree.get_node('node-1')!.state.disabled).toBe(false);
+    expect(tree.getNode('node-1')!.state.disabled).toBe(false);
   });
 
   it('should destroy cleanly', () => {
@@ -134,15 +135,14 @@ describe('MDFolderTree', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('should emit events on select', (done) => {
+  it('should emit events on select', async () => {
     const tree = new MDFolderTree(container, { core: { data: sampleData } });
-
-    container.addEventListener('select_node.MDFolderTree', ((e: CustomEvent) => {
-      expect(e.detail.node.id).toBe('node-2');
-      done();
-    }) as EventListener);
+    const selected = nextEvent(container, 'select_node.MDFolderTree');
 
     tree.select_node('node-2');
+
+    const { detail } = await selected;
+    expect(detail.node.id).toBe('node-2');
   });
 
   it('should support single-select mode', () => {

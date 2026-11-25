@@ -29,7 +29,7 @@ describe('SortPlugin', () => {
   });
 
   it('should sort root nodes alphabetically by default', () => {
-    const tree = new MDFolderTree(container, {
+    new MDFolderTree(container, {
       core: { data: unsortedData },
       plugins: ['sort'],
     });

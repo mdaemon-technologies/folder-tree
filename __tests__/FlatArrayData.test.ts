@@ -29,7 +29,7 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: flatData },
     });
 
-    const root1 = tree.get_node('root-1');
+    const root1 = tree.getNode('root-1');
     expect(root1).toBeTruthy();
     expect(root1!.parent).toBe('#');
     expect(root1!.children).toContain('child-1');
@@ -41,7 +41,7 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: flatData },
     });
 
-    const child1 = tree.get_node('child-1');
+    const child1 = tree.getNode('child-1');
     expect(child1).toBeTruthy();
     expect(child1!.parent).toBe('root-1');
   });
@@ -51,7 +51,7 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: flatData },
     });
 
-    const grandchild = tree.get_node('grandchild-1');
+    const grandchild = tree.getNode('grandchild-1');
     expect(grandchild).toBeTruthy();
     expect(grandchild!.parent).toBe('child-1');
     expect(grandchild!.parents).toContain('child-1');
@@ -64,11 +64,11 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: flatData },
     });
 
-    const root1 = tree.get_node('root-1');
+    const root1 = tree.getNode('root-1');
     expect(root1!.children_d).toContain('child-1');
     expect(root1!.children_d).toContain('child-2');
 
-    const child1 = tree.get_node('child-1');
+    const child1 = tree.getNode('child-1');
     expect(child1!.children_d).toContain('grandchild-1');
   });
 
@@ -77,7 +77,7 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: flatData },
     });
 
-    const root2 = tree.get_node('root-2');
+    const root2 = tree.getNode('root-2');
     expect(root2).toBeTruthy();
     expect(root2!.parent).toBe('#');
     expect(root2!.children).toHaveLength(0);
@@ -107,8 +107,8 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: typedData },
     });
 
-    const folder = tree.get_node('f1');
-    const doc = tree.get_node('d1');
+    const folder = tree.getNode('f1');
+    const doc = tree.getNode('d1');
     expect(folder!.type).toBe('folder');
     expect(doc!.type).toBe('document');
   });
@@ -126,10 +126,10 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: nestedData },
     });
 
-    const parent = tree.get_node('n1');
+    const parent = tree.getNode('n1');
     expect(parent!.children).toContain('n2');
 
-    const child = tree.get_node('n2');
+    const child = tree.getNode('n2');
     expect(child!.parent).toBe('n1');
   });
 
@@ -144,9 +144,9 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: allRoots },
     });
 
-    expect(tree.get_node('a')!.parent).toBe('#');
-    expect(tree.get_node('b')!.parent).toBe('#');
-    expect(tree.get_node('c')!.parent).toBe('#');
+    expect(tree.getNode('a')!.parent).toBe('#');
+    expect(tree.getNode('b')!.parent).toBe('#');
+    expect(tree.getNode('c')!.parent).toBe('#');
   });
 
   it('should handle nodes listed before their parent in the array', () => {
@@ -160,14 +160,14 @@ describe('Flat array with parent references (jstree-style)', () => {
       core: { data: outOfOrder },
     });
 
-    const top = tree.get_node('top');
+    const top = tree.getNode('top');
     expect(top!.children).toContain('mid');
 
-    const mid = tree.get_node('mid');
+    const mid = tree.getNode('mid');
     expect(mid!.children).toContain('leaf');
     expect(mid!.parent).toBe('top');
 
-    const leaf = tree.get_node('leaf');
+    const leaf = tree.getNode('leaf');
     expect(leaf!.parent).toBe('mid');
     expect(leaf!.parents).toContain('mid');
     expect(leaf!.parents).toContain('top');

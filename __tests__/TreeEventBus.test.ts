@@ -13,17 +13,19 @@ describe('TreeEventBus', () => {
     bus.destroy();
   });
 
-  it('should emit and listen to events', (done) => {
+  it('should emit and listen to events', () => {
+    let received: unknown;
     bus.on('test.event', ((e: CustomEvent) => {
-      expect(e.detail).toEqual({ value: 42 });
-      done();
+      received = e.detail;
     }) as EventListener);
 
     bus.emit('test.event', { value: 42 });
+
+    expect(received).toEqual({ value: 42 });
   });
 
   it('should remove listeners', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     bus.on('test.event', handler as unknown as (e: CustomEvent) => void);
     bus.off('test.event', handler as unknown as (e: CustomEvent) => void);
 
@@ -32,7 +34,7 @@ describe('TreeEventBus', () => {
   });
 
   it('should clean up all listeners on destroy', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     bus.on('test.event', handler as unknown as (e: CustomEvent) => void);
     bus.destroy();
 

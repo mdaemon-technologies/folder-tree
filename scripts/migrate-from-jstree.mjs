@@ -10,7 +10,7 @@
  */
 
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
-import { join, relative, extname } from 'node:path';
+import { join, relative, extname, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 
 // ---------------------------------------------------------------------------
@@ -283,8 +283,8 @@ async function main() {
     process.exit(1);
   }
 
-  // Resolve and validate
-  const resolvedDir = join(process.cwd(), targetDir);
+  // Resolve against the cwd (an absolute path stands as given) and validate
+  const resolvedDir = resolve(targetDir);
   try {
     const s = await stat(resolvedDir);
     if (!s.isDirectory()) {

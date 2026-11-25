@@ -96,8 +96,8 @@ describe('Node id uniqueness', () => {
     it('should generate distinct ids for successive nodes created without one', () => {
       const tree = new MDFolderTree(container, { core: { data: base, check_callback: true } });
 
-      const first = tree.createNode('b', { text: 'First' } as TreeNodeData);
-      const second = tree.createNode('b', { text: 'Second' } as TreeNodeData);
+      const first = tree.createNode('b', { text: 'First' });
+      const second = tree.createNode('b', { text: 'Second' });
 
       expect(first).not.toBe(false);
       expect(second).not.toBe(false);
@@ -110,7 +110,7 @@ describe('Node id uniqueness', () => {
 
       // Occupy the id the generator would otherwise mint first.
       tree.createNode('b', { id: 'new_1', text: 'Squatter' });
-      const generated = tree.createNode('b', { text: 'Generated' } as TreeNodeData);
+      const generated = tree.createNode('b', { text: 'Generated' });
 
       expect(generated).not.toBe(false);
       expect((generated as { id: string }).id).not.toBe('new_1');

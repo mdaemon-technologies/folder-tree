@@ -124,7 +124,7 @@ describe('Massload parity', () => {
       } as never);
       const events: string[] = [];
       tree.on('load_all.MDFolderTree', (e) => events.push((e.detail as { node: TreeNode }).node.id));
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       tree.load_all(undefined, callback);
 
@@ -155,7 +155,7 @@ describe('Massload parity', () => {
           },
         },
       } as never);
-      const callback = jest.fn();
+      const callback = vi.fn();
 
       tree.load_all(undefined, callback);
 

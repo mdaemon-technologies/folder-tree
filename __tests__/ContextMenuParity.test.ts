@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
 import type { TreeNode, TreeNodeData } from '../src/types';
+import { delay } from './helpers/async';
 
 /**
  * Context menu parity with jstree 3.3.16's contextmenu plugin and its
@@ -26,7 +27,7 @@ describe('Context menu parity', () => {
     MDFolderTree.getInstance(container)?.destroy();
     container.remove();
     document.querySelectorAll('.vakata-context').forEach((el) => el.remove());
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   const data = (): TreeNodeData[] => [
@@ -56,7 +57,7 @@ describe('Context menu parity', () => {
 
   describe('items and actions', () => {
     it('should hand an action the item, the node anchor as reference, the menu and the position', () => {
-      const action = jest.fn();
+      const action = vi.fn();
       const tree = build({ items: { go: { label: 'Go', action } } });
 
       rightClick('n1');
@@ -94,13 +95,13 @@ describe('Context menu parity', () => {
 
       rightClick('n1');
       expect(menu()).toBeNull();
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await delay();
 
       expect(itemNamed('Later')).toBeDefined();
     });
 
     it('should do nothing for a disabled item, and keep the menu open', () => {
-      const action = jest.fn();
+      const action = vi.fn();
       build({ items: { off: { label: 'Off', _disabled: true, action } } });
 
       rightClick('n1');
@@ -260,15 +261,15 @@ describe('Context menu parity', () => {
     });
 
     it('should open on a long touch press', () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       build();
 
       anchor('n1').dispatchEvent(
         new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', clientX: 10, clientY: 10 }),
       );
-      jest.advanceTimersByTime(749);
+      vi.advanceTimersByTime(749);
       expect(menu()).toBeNull();
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
 
       expect(menu()).not.toBeNull();
     });
@@ -276,7 +277,7 @@ describe('Context menu parity', () => {
 
   describe('keyboard', () => {
     it('should move between items, open a submenu, run an item on Enter and close on Escape', () => {
-      const run = jest.fn();
+      const run = vi.fn();
       build({
         items: {
           one: { label: 'One', action: () => undefined },

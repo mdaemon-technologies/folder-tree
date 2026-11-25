@@ -121,48 +121,40 @@ describe('Keyboard Navigation', () => {
   });
 
   describe('End key with collapsed nodes', () => {
-    it('should focus a closed parent when it is the last node', () => {
-      const tree = new MDFolderTree(container, {
+    /** Swap the beforeEach tree for one whose last root, `last`, holds `kid`. */
+    const rebuild = (lastOpened: boolean) => {
+      tree.destroy();
+      tree = new MDFolderTree(container, {
         core: {
           data: [
             { id: 'first', text: 'First' },
-            { id: 'last', text: 'Last', children: [{ id: 'kid', text: 'Kid' }] },
+            { id: 'last', text: 'Last', state: { opened: lastOpened }, children: [{ id: 'kid', text: 'Kid' }] },
           ],
         },
       });
+    };
+
+    it('should focus a closed parent when it is the last node', () => {
+      rebuild(false);
       expect(tree.is_closed('last')).toBe(true);
 
-      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+      pressKey('End');
 
       expect(container.getAttribute('aria-activedescendant')).toBe('last');
     });
 
     it('should not focus a child hidden inside a collapsed parent', () => {
-      new MDFolderTree(container, {
-        core: {
-          data: [
-            { id: 'first', text: 'First' },
-            { id: 'last', text: 'Last', children: [{ id: 'kid', text: 'Kid' }] },
-          ],
-        },
-      });
+      rebuild(false);
 
-      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+      pressKey('End');
 
       expect(container.getAttribute('aria-activedescendant')).not.toBe('kid');
     });
 
     it('should focus the deepest visible node when the last parent is open', () => {
-      new MDFolderTree(container, {
-        core: {
-          data: [
-            { id: 'first', text: 'First' },
-            { id: 'last', text: 'Last', state: { opened: true }, children: [{ id: 'kid', text: 'Kid' }] },
-          ],
-        },
-      });
+      rebuild(true);
 
-      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+      pressKey('End');
 
       expect(container.getAttribute('aria-activedescendant')).toBe('kid');
     });

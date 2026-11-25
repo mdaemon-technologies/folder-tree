@@ -64,14 +64,14 @@ describe('Node Visibility', () => {
   });
 
   test('hide_node emits event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('hide_node.MDFolderTree', handler);
     tree.hide_node('n1');
     expect(handler).toHaveBeenCalled();
   });
 
   test('show_node emits event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('show_node.MDFolderTree', handler);
     tree.hide_node('n1');
     tree.show_node('n1');

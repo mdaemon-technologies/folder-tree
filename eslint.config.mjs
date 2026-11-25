@@ -1,5 +1,5 @@
 // ESLint flat config: the recommended JavaScript and TypeScript rules over the
-// library source. Tests are checked by their own run (ts-jest) instead.
+// library source. Tests are type-checked by `npm run typecheck` (tsconfig.test.json) instead.
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 

@@ -1,5 +1,5 @@
 import type { MDFolderTree } from '../MDFolderTree';
-import type { CheckMore, TreeNode, TreeNodeData, TreePlugin, TreePluginHost, TypeConfig, EventHandler } from '../types';
+import type { CheckMore, NewNodeData, TreeNode, TreePlugin, TreePluginHost, TypeConfig, EventHandler } from '../types';
 
 /** jstree's rule defaults: -1 everywhere, meaning "no limit". */
 const UNLIMITED = { max_children: -1, max_depth: -1, valid_children: -1 } as const;
@@ -81,7 +81,7 @@ export class TypesPlugin implements TreePlugin {
    */
   onCheck(
     chk: string,
-    node: TreeNode | TreeNodeData | null,
+    node: TreeNode | NewNodeData | null,
     parent: TreeNode | null,
     _pos: unknown,
     _more: CheckMore,

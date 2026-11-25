@@ -1,5 +1,7 @@
 import { MDFolderTree } from '../../src/MDFolderTree';
 import type { TreeNodeData } from '../../src/types';
+import { nextEvent } from '../helpers/async';
+import { stubLocalStorage } from '../helpers/storage';
 
 describe('StatePlugin', () => {
   let container: HTMLElement;
@@ -21,27 +23,16 @@ describe('StatePlugin', () => {
     document.body.appendChild(container);
 
     // Saving is debounced by 100ms, as in jstree.
-    jest.useFakeTimers({ doNotFake: ['queueMicrotask'] });
+    vi.useFakeTimers();
 
-    // Mock localStorage
-    mockStorage = {};
-    Object.defineProperty(window, 'localStorage', {
-      value: {
-        getItem: (key: string) => mockStorage[key] ?? null,
-        setItem: (key: string, value: string) => { mockStorage[key] = value; },
-        removeItem: (key: string) => { delete mockStorage[key]; },
-        clear: () => { mockStorage = {}; },
-      },
-      writable: true,
-      configurable: true,
-    });
+    mockStorage = stubLocalStorage();
   });
 
   afterEach(() => {
     const instance = MDFolderTree.getInstance(container);
     if (instance) instance.destroy();
     document.body.removeChild(container);
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it('should save state to localStorage on selection change', async () => {
@@ -54,7 +45,7 @@ describe('StatePlugin', () => {
     await Promise.resolve(); // saving starts after ready, as in jstree
 
     tree.select_node('n2');
-    jest.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
 
     const stored = JSON.parse(mockStorage['test-tree-state']);
     expect(stored.state.core.selected).toContain('n2');
@@ -70,7 +61,7 @@ describe('StatePlugin', () => {
     await Promise.resolve(); // saving starts after ready, as in jstree
 
     tree.open_node('n1');
-    jest.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
 
     const stored = JSON.parse(mockStorage['test-tree-state']);
     expect(stored.state.core.open).toContain('n1');
@@ -153,20 +144,19 @@ describe('StatePlugin', () => {
     expect(tree.get_selected()).toEqual([]);
   });
 
-  it('should emit state_ready event after restoring', (done) => {
+  it('should emit state_ready event after restoring', async () => {
     mockStorage['test-tree-state'] = JSON.stringify({
       state: { opened: [], selected: [] },
     });
-
-    container.addEventListener('state_ready.MDFolderTree', () => {
-      done();
-    });
+    const ready = nextEvent(container, 'state_ready.MDFolderTree');
 
     new MDFolderTree(container, {
       core: { data: sampleData },
       plugins: ['state'],
       state: { key: 'test-tree-state' },
     });
+
+    await expect(ready).resolves.toBeInstanceOf(CustomEvent);
   });
 
   it("should use jstree's default key when none is specified", async () => {
@@ -178,7 +168,7 @@ describe('StatePlugin', () => {
     await Promise.resolve(); // saving starts after ready, as in jstree
 
     tree.select_node('n1');
-    jest.advanceTimersByTime(100);
+    vi.advanceTimersByTime(100);
     expect(mockStorage['jstree']).toBeDefined();
   });
 

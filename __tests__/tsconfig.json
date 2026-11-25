@@ -1,0 +1,6 @@
+{
+  // For editors, which take the nearest tsconfig.json: without this, test files
+  // fall into an inferred project with no Vitest globals. `npm run typecheck`
+  // uses ../tsconfig.test.json directly.
+  "extends": "../tsconfig.test.json"
+}

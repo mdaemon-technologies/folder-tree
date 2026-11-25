@@ -35,7 +35,7 @@ describe('Inline Editing', () => {
   });
 
   test('edit commits on Enter', () => {
-    const callback = jest.fn();
+    const callback = vi.fn();
     tree.edit('n1', undefined, callback);
     const input = container.querySelector('#n1 .md-tree-rename-input') as HTMLInputElement;
     input.value = 'New Name';
@@ -45,7 +45,7 @@ describe('Inline Editing', () => {
   });
 
   test('edit cancels on Escape', () => {
-    const callback = jest.fn();
+    const callback = vi.fn();
     tree.edit('n1', undefined, callback);
     const input = container.querySelector('#n1 .md-tree-rename-input') as HTMLInputElement;
     input.value = 'Should Not Apply';
@@ -64,7 +64,7 @@ describe('Inline Editing', () => {
   });
 
   test('edit emits edit event', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('edit.MDFolderTree', handler);
     tree.edit('n1');
     expect(handler).toHaveBeenCalled();
@@ -77,7 +77,7 @@ describe('Inline Editing', () => {
   });
 
   test('edit with unchanged text does not rename', () => {
-    const callback = jest.fn();
+    const callback = vi.fn();
     tree.edit('n1', undefined, callback);
     const input = container.querySelector('#n1 .md-tree-rename-input') as HTMLInputElement;
     // Don't change value, just press Enter

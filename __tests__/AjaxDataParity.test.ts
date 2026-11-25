@@ -1,5 +1,7 @@
 import { MDFolderTree } from '../src/MDFolderTree';
+import type { Mock } from 'vitest';
 import type { TreeNode } from '../src/types';
+import { macrotasks } from './helpers/async';
 
 /**
  * The ajax and string forms of jstree 3.3.16's `core.data` — and the ajax
@@ -15,7 +17,7 @@ import type { TreeNode } from '../src/types';
  */
 describe('ajax and string core.data', () => {
   let container: HTMLElement;
-  let fetchMock: jest.Mock;
+  let fetchMock: Mock;
   const realFetch = (globalThis as { fetch?: unknown }).fetch;
 
   const respond = (body: string, type = 'application/json', status = 200) => ({
@@ -26,16 +28,14 @@ describe('ajax and string core.data', () => {
   });
 
   /** Let the mocked request and its response settle. */
-  const settle = async () => {
-    for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
-  };
+  const settle = () => macrotasks(5);
 
   const call = (n: number) => fetchMock.mock.calls[n] as [string, RequestInit];
 
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
-    fetchMock = jest.fn();
+    fetchMock = vi.fn();
     (globalThis as { fetch?: unknown }).fetch = fetchMock;
   });
 

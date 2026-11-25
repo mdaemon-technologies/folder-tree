@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../src/MDFolderTree';
 import type { TreeNode, TreeNodeData } from '../src/types';
+import { macrotasks } from './helpers/async';
 
 /**
  * core.worker parity with jstree 3.3.16: where Web Workers exist, JSON loads
@@ -40,7 +41,7 @@ describe('core.worker parity', () => {
       const url = `blob:worker/${++next}`;
       sources.set(url, blob.parts.join(''));
       return url;
-    }) as typeof URL.createObjectURL;
+    }) as unknown as typeof URL.createObjectURL;
     URL.revokeObjectURL = (url: string) => {
       revoked.push(url);
     };
@@ -88,9 +89,7 @@ describe('core.worker parity', () => {
     URL.revokeObjectURL = saved.revoke as typeof URL.revokeObjectURL;
   });
 
-  const settle = async () => {
-    for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
-  };
+  const settle = () => macrotasks(6);
 
   const data = (): TreeNodeData[] => [
     { id: 'a', text: 'A', children: [{ id: 'a1', text: 'A1' }] },
@@ -135,7 +134,7 @@ describe('core.worker parity', () => {
       },
     } as never);
     await settle();
-    const done = jest.fn();
+    const done = vi.fn();
 
     tree.load_node('lz', done);
     expect(done).not.toHaveBeenCalled();
@@ -218,7 +217,7 @@ describe('core.worker parity', () => {
   });
 
   it('should drop the subtree of a node whose id was taken while it was in the worker', async () => {
-    const error = jest.fn();
+    const error = vi.fn();
     const tree = new MDFolderTree(container, { core: { data: data(), check_callback: true, error } });
 
     tree.create_node('#', { id: 'a', text: 'Mine' });

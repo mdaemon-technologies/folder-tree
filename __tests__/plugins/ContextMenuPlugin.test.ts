@@ -1,5 +1,6 @@
 import { MDFolderTree } from '../../src/MDFolderTree';
 import type { TreeNodeData } from '../../src/types';
+import { nextEvent } from '../helpers/async';
 
 describe('ContextMenuPlugin', () => {
   let container: HTMLElement;
@@ -80,7 +81,7 @@ describe('ContextMenuPlugin', () => {
       plugins: ['contextmenu'],
       contextmenu: {
         items: {
-          custom: { label: 'Custom Action', action: jest.fn() },
+          custom: { label: 'Custom Action', action: vi.fn(() => undefined) },
         },
       },
     });
@@ -95,8 +96,8 @@ describe('ContextMenuPlugin', () => {
   });
 
   it('should support items as a function', () => {
-    const itemsFn = jest.fn().mockReturnValue({
-      dynamic: { label: 'Dynamic Item', action: jest.fn() },
+    const itemsFn = vi.fn().mockReturnValue({
+      dynamic: { label: 'Dynamic Item', action: vi.fn() },
     });
 
     new MDFolderTree(container, {
@@ -169,19 +170,18 @@ describe('ContextMenuPlugin', () => {
     expect(tree.get_selected()).not.toContain('n2');
   });
 
-  it('should emit show_contextmenu event', (done) => {
+  it('should emit show_contextmenu event', async () => {
     new MDFolderTree(container, {
       core: { data: sampleData, check_callback: true },
       plugins: ['contextmenu'],
     });
-
-    container.addEventListener('show_contextmenu.MDFolderTree', ((e: CustomEvent) => {
-      expect(e.detail.node.id).toBe('n1');
-      done();
-    }) as EventListener);
+    const shown = nextEvent(container, 'show_contextmenu.MDFolderTree');
 
     const anchor = container.querySelector('#n1 .md-tree-anchor') as HTMLElement;
     anchor.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+
+    const { detail } = await shown;
+    expect(detail.node.id).toBe('n1');
   });
 
   it('should clean up menu on destroy', () => {

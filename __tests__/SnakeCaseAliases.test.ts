@@ -53,7 +53,7 @@ describe('Snake_case CRUD Aliases', () => {
   test('create_node creates a node', () => {
     const result = tree.create_node('parent', { id: 'new-1', text: 'New Node' });
     expect(result).not.toBe(false);
-    expect(tree.get_node('new-1')).not.toBeNull();
+    expect(tree.get_node('new-1')).not.toBe(false);
   });
 
   test('rename_node renames a node', () => {

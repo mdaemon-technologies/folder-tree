@@ -1,3 +1,8 @@
+# The package supports Node 20 and later (`engines`), but the toolchain does
+# not: Vitest 5 and jsdom 31 need Node 22.22. So the full suite runs where the
+# toolchain does, and the bundles it builds are smoke-tested on Node 20 with
+# nothing but node:test (smoke/).
+
 name: CI
 
 on:
@@ -12,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20, 22, 24, 26]
+        node-version: [22, 24, 26]
 
     steps:
       - uses: actions/checkout@v7
@@ -35,5 +40,47 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # `npm test` shares one environment across files (isolate: false); one
+      # isolated run catches a test that only passes because of another file.
+      - name: Run tests isolated
+        if: matrix.node-version == 24
+        run: npm run test:isolated
+
       - name: Build
         run: npm run build
+
+      - name: Smoke-test the build
+        run: npm run test:smoke
+
+      - name: Keep the build for the Node 20 smoke test
+        if: matrix.node-version == 24
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  smoke:
+    needs: test
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # The `engines` floor, as in publish.yml's smoke job: change both together.
+      - name: Use Node.js 20
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+
+      # The build tested above; dist/ is not committed.
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      # No npm ci: the smoke tests use only node:test, the built bundles and
+      # the shipped codemod.
+      - name: Smoke-test the build
+        run: npm run test:smoke

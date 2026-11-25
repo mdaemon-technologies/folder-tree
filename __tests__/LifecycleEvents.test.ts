@@ -29,14 +29,14 @@ describe('Lifecycle Events', () => {
   });
 
   test('loading event fires during initialization', () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('loading.MDFolderTree', handler);
     tree = new MDFolderTree(container, { core: { data: sampleData } });
     expect(handler).toHaveBeenCalled();
   });
 
   test('loaded event fires after initialization', async () => {
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('loaded.MDFolderTree', handler);
     tree = new MDFolderTree(container, { core: { data: sampleData } });
     await Promise.resolve();
@@ -76,7 +76,7 @@ describe('Lifecycle Events', () => {
 
   test('activate_node event fires on click', () => {
     tree = new MDFolderTree(container, { core: { data: sampleData } });
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('activate_node.MDFolderTree', handler);
     const anchor = container.querySelector('#solo > .md-tree-anchor') as HTMLElement;
     anchor.click();
@@ -86,7 +86,7 @@ describe('Lifecycle Events', () => {
 
   test('hover_node event fires on mouseenter', () => {
     tree = new MDFolderTree(container, { core: { data: sampleData } });
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('hover_node.MDFolderTree', handler);
     const anchor = container.querySelector('#solo > .md-tree-anchor') as HTMLElement;
     anchor.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
@@ -95,7 +95,7 @@ describe('Lifecycle Events', () => {
 
   test('dehover_node event fires on mouseleave', () => {
     tree = new MDFolderTree(container, { core: { data: sampleData } });
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('dehover_node.MDFolderTree', handler);
     const anchor = container.querySelector('#solo > .md-tree-anchor') as HTMLElement;
     // As in jstree, only a hovered node can be dehovered, so hover it first.
@@ -107,7 +107,7 @@ describe('Lifecycle Events', () => {
   test('enable_node event fires', () => {
     tree = new MDFolderTree(container, { core: { data: sampleData } });
     tree.disable_node('solo');
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('enable_node.MDFolderTree', handler);
     tree.enable_node('solo');
     expect(handler).toHaveBeenCalled();
@@ -115,7 +115,7 @@ describe('Lifecycle Events', () => {
 
   test('disable_node event fires', () => {
     tree = new MDFolderTree(container, { core: { data: sampleData } });
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('disable_node.MDFolderTree', handler);
     tree.disable_node('solo');
     expect(handler).toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe('Lifecycle Events', () => {
 
   test('redraw event fires on redraw()', () => {
     tree = new MDFolderTree(container, { core: { data: sampleData } });
-    const handler = jest.fn();
+    const handler = vi.fn();
     container.addEventListener('redraw.MDFolderTree', handler);
     tree.redraw();
     expect(handler).toHaveBeenCalled();

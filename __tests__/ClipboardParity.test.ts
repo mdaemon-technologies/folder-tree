@@ -111,8 +111,8 @@ describe('clipboard parity', () => {
   describe('events', () => {
     it('should emit cut and copy with the nodes given', () => {
       const tree = build(left);
-      const cut = jest.fn();
-      const copy = jest.fn();
+      const cut = vi.fn();
+      const copy = vi.fn();
       tree.on('cut.MDFolderTree', (e) => cut((e as CustomEvent).detail));
       tree.on('copy.MDFolderTree', (e) => copy((e as CustomEvent).detail));
 
@@ -125,7 +125,7 @@ describe('clipboard parity', () => {
 
     it('should emit paste with the parent, the nodes and the mode', () => {
       const tree = build(left);
-      const paste = jest.fn();
+      const paste = vi.fn();
       tree.on('paste.MDFolderTree', (e) => paste((e as CustomEvent).detail));
       tree.cut(['a', 'b']);
 
@@ -139,7 +139,7 @@ describe('clipboard parity', () => {
 
     it('should empty the buffer on paste without clear_buffer', () => {
       const tree = build(left);
-      const cleared = jest.fn();
+      const cleared = vi.fn();
       tree.on('clear_buffer.MDFolderTree', cleared);
       tree.cut('a');
 
